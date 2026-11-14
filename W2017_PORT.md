@@ -42,3 +42,39 @@ Two options:
 
 Either way: keep `veyronlte_ctc_defconfig`, keep the panel driver, keep the hall
 plumbing.
+
+
+## Why a dedicated kernel
+
+Other msm8996 trees (including LineageOS' and the S7 ones) do not carry the
+`veyronlte` board files, the S6E3FA5_AMS420MS01 panel driver or the `folder_hall`
+plumbing. Starting from a foreign tree means re-porting all of that *and*
+re-validating the display path, which is more work and a much worse failure mode
+(a wrong panel select can leave the phone dark while everything else "works").
+Base = this tree; borrow patches, not boards.
+
+## Android 11 (LineageOS 18.1) config gaps in the stock defconfig
+
+Already present: `CONFIG_ANDROID_BINDER_IPC`, `CONFIG_ASHMEM`, `CONFIG_ION`,
+`CONFIG_SW_SYNC`, `CONFIG_DM_VERITY`, `CONFIG_SECURITY_SELINUX`,
+`CONFIG_FUSE_FS`, `CONFIG_CGROUP_FREEZER/CPUACCT/SCHED`, `CONFIG_NAMESPACES`,
+`CONFIG_NETFILTER_XT_MATCH_QTAGUID`, `CONFIG_EXT4_FS_SECURITY`.
+
+Missing / needs work:
+
+| Config | Impact |
+|---|---|
+| `CONFIG_USB_CONFIGFS` (+ `USB_CONFIGFS_F_FS`, `_F_MTP`) | not enabled, but `drivers/usb/gadget/configfs.c` **exists** in this tree — Android 11 adb/MTP needs it (stock uses `USB_G_ANDROID` legacy gadget) |
+| `CONFIG_QUOTA`, `CONFIG_QUOTACTL`, `CONFIG_QFMT_V2` | ext4 project quota / storage stats |
+| `CONFIG_MEMCG` | LMKD memory pressure (alternative: keep vmpressure and patch lmkd) |
+| `CONFIG_CGROUP_BLKIO` | blkio cgroup (minor) |
+| `CONFIG_SDCARDFS` | absent; Android 11 can use FUSE (`FUSE_FS=y`) instead |
+| `CONFIG_PSI` | not available on 3.18; needs memcg/vmpressure fallback |
+| `CONFIG_ENCRYPTED_KEYS` | FBE only; W2017 uses FDE, so not blocking |
+
+## Patch source
+
+`ivanmeler/android_kernel_samsung_msm8996`, branch `lineage-18.1` (and
+`lineage-18.1-caf`) — same Samsung 3.18.20 baseline, already patched for 18.1 on
+msm8996. Cherry-pick the Android-11 enabling commits (gadget configfs, quota,
+memcg, sdcardfs/FUSE, SELinux bits) onto this tree instead of switching base.
