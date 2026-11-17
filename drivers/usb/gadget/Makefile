@@ -4,6 +4,9 @@
 subdir-ccflags-$(CONFIG_USB_GADGET_DEBUG)	:= -DDEBUG
 subdir-ccflags-$(CONFIG_USB_GADGET_VERBOSE)	+= -DVERBOSE_DEBUG
 ccflags-y				+= -I$(srctree)/drivers/usb/gadget/udc -I$(srctree)/drivers/usb/gadget/function
+# android.c #includes function/f_mtp.c, which in turn includes "configfs.h"
+# from this directory; without -I here that nested include does not resolve.
+ccflags-y				+= -I$(srctree)/drivers/usb/gadget
 
 obj-$(CONFIG_USB_LIBCOMPOSITE)	+= libcomposite.o
 libcomposite-y			:= usbstring.o config.o epautoconf.o
