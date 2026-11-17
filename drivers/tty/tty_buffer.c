@@ -25,7 +25,11 @@
  * Byte threshold to limit memory consumption for flip buffers.
  * The actual memory limit is > 2x this amount.
  */
+<<<<<<< /data/w2017/kernel/drivers/tty/tty_buffer.c
 #define TTYB_DEFAULT_MEM_LIMIT	131072
+=======
+#define TTYB_DEFAULT_MEM_LIMIT	(640 * 1024UL)
+>>>>>>> /data/w2017/ref/linux-3.18.140/drivers/tty/tty_buffer.c
 
 /*
  * We default to dicing tty buffer allocations to this many characters
@@ -416,6 +420,8 @@ receive_buf(struct tty_struct *tty, struct tty_buffer *head, int count)
 			disc->ops->receive_buf(tty, p, f, count);
 	}
 	head->read += count;
+	if (count > 0)
+		memset(p, 0, count);
 	return count;
 }
 

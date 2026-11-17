@@ -1218,6 +1218,21 @@ int ufshcd_hold(struct ufs_hba *hba, bool async)
 start:
 	switch (hba->clk_gating.state) {
 	case CLKS_ON:
+		/*
+		 * Wait for the ungate work to complete if in progress.
+		 * Though the clocks may be in ON state, the link could
+		 * still be in hibner8 state if hibern8 is allowed
+		 * during clock gating.
+		 * Make sure we exit hibern8 state also in addition to
+		 * clocks being ON.
+		 */
+		if (ufshcd_can_hibern8_during_gating(hba) &&
+		    ufshcd_is_link_hibern8(hba)) {
+			spin_unlock_irqrestore(hba->host->host_lock, flags);
+			flush_work(&hba->clk_gating.ungate_work);
+			spin_lock_irqsave(hba->host->host_lock, flags);
+			goto start;
+		}
 		break;
 	case REQ_CLKS_OFF:
 		if (cancel_delayed_work(&hba->clk_gating.gate_work)) {
@@ -1984,7 +1999,11 @@ static inline void ufshcd_copy_sense_data(struct ufshcd_lrb *lrbp)
 
 		memcpy(lrbp->sense_buffer,
 			lrbp->ucd_rsp_ptr->sr.sense_data,
+<<<<<<< /data/w2017/kernel/drivers/scsi/ufs/ufshcd.c
 			min_t(int, len_to_copy, UFSHCD_REQ_SENSE_SIZE));
+=======
+			min_t(int, len_to_copy, SCSI_SENSE_BUFFERSIZE));
+>>>>>>> /data/w2017/ref/linux-3.18.140/drivers/scsi/ufs/ufshcd.c
 	}
 }
 
@@ -4756,7 +4775,11 @@ static int ufshcd_slave_alloc(struct scsi_device *sdev)
 	/* REPORT SUPPORTED OPERATION CODES is not supported */
 	sdev->no_report_opcodes = 1;
 
+<<<<<<< /data/w2017/kernel/drivers/scsi/ufs/ufshcd.c
 	/* WRITE_SAME command is not supported*/
+=======
+	/* WRITE_SAME command is not supported */
+>>>>>>> /data/w2017/ref/linux-3.18.140/drivers/scsi/ufs/ufshcd.c
 	sdev->no_write_same = 1;
 
 	ufshcd_set_queue_depth(sdev);
@@ -5474,7 +5497,11 @@ static void ufshcd_exception_event_handler(struct work_struct *work)
 	hba = container_of(work, struct ufs_hba, eeh_work);
 
 	pm_runtime_get_sync(hba->dev);
+<<<<<<< /data/w2017/kernel/drivers/scsi/ufs/ufshcd.c
 	ufshcd_scsi_block_requests(hba);
+=======
+	scsi_block_requests(hba->host);
+>>>>>>> /data/w2017/ref/linux-3.18.140/drivers/scsi/ufs/ufshcd.c
 	err = ufshcd_get_ee_status(hba, &status);
 	if (err) {
 		dev_err(hba->dev, "%s: failed to get exception status %d\n",
@@ -5631,8 +5658,14 @@ static bool ufshcd_quirk_dl_nac_errors(struct ufs_hba *hba)
 		hba->silence_err_logs = true;
 	}
 out:
+<<<<<<< /data/w2017/kernel/drivers/scsi/ufs/ufshcd.c
 	spin_unlock_irqrestore(hba->host->host_lock, flags);
 	return err_handling;
+=======
+	scsi_unblock_requests(hba->host);
+	pm_runtime_put_sync(hba->dev);
+	return;
+>>>>>>> /data/w2017/ref/linux-3.18.140/drivers/scsi/ufs/ufshcd.c
 }
 
 /**
@@ -7402,11 +7435,14 @@ static int ufshcd_config_vreg(struct device *dev,
 		struct ufs_vreg *vreg, bool on)
 {
 	int ret = 0;
-	struct regulator *reg = vreg->reg;
-	const char *name = vreg->name;
+	struct regulator *reg;
+	const char *name;
 	int min_uV, uA_load;
 
 	BUG_ON(!vreg);
+
+	reg = vreg->reg;
+	name = vreg->name;
 
 	if (regulator_count_voltages(reg) > 0) {
 		min_uV = on ? vreg->min_uV : 0;
@@ -8405,9 +8441,12 @@ EXPORT_SYMBOL(ufshcd_system_suspend);
 
 int ufshcd_system_resume(struct ufs_hba *hba)
 {
+<<<<<<< /data/w2017/kernel/drivers/scsi/ufs/ufshcd.c
 	int ret = 0;
 	ktime_t start = ktime_get();
 
+=======
+>>>>>>> /data/w2017/ref/linux-3.18.140/drivers/scsi/ufs/ufshcd.c
 	if (!hba)
 		return -EINVAL;
 
@@ -8437,6 +8476,7 @@ EXPORT_SYMBOL(ufshcd_system_resume);
  */
 int ufshcd_runtime_suspend(struct ufs_hba *hba)
 {
+<<<<<<< /data/w2017/kernel/drivers/scsi/ufs/ufshcd.c
 	int ret = 0;
 	ktime_t start = ktime_get();
 
@@ -8483,10 +8523,13 @@ int ufshcd_runtime_resume(struct ufs_hba *hba)
 	int ret = 0;
 	ktime_t start = ktime_get();
 
+=======
+>>>>>>> /data/w2017/ref/linux-3.18.140/drivers/scsi/ufs/ufshcd.c
 	if (!hba)
 		return -EINVAL;
 
 	if (!hba->is_powered)
+<<<<<<< /data/w2017/kernel/drivers/scsi/ufs/ufshcd.c
 		goto out;
 	else
 		ret = ufshcd_resume(hba, UFS_RUNTIME_PM);
@@ -8873,6 +8916,9 @@ static struct attribute *ufs_attributes[] = {
 	&dev_attr_gear.attr,
 	NULL
 };
+=======
+		return 0;
+>>>>>>> /data/w2017/ref/linux-3.18.140/drivers/scsi/ufs/ufshcd.c
 
 static struct attribute_group ufs_attribute_group = {
 	.attrs  = ufs_attributes,
@@ -8880,6 +8926,7 @@ static struct attribute_group ufs_attribute_group = {
 
 static void ufshcd_add_caps_sysfs_node(struct ufs_hba *hba)
 {
+<<<<<<< /data/w2017/kernel/drivers/scsi/ufs/ufshcd.c
 	int err  = -ENOMEM;
 
 	struct device *dev= &(hba->host->shost_dev);
@@ -8887,6 +8934,15 @@ static void ufshcd_add_caps_sysfs_node(struct ufs_hba *hba)
 
 	if (err)
 		printk( "cannot create sysfs group err: %d\n", err);
+=======
+	if (!hba)
+		return -EINVAL;
+
+	if (!hba->is_powered)
+		return 0;
+
+	return ufshcd_resume(hba, UFS_RUNTIME_PM);
+>>>>>>> /data/w2017/ref/linux-3.18.140/drivers/scsi/ufs/ufshcd.c
 }
 
 static inline void ufshcd_add_sysfs_nodes(struct ufs_hba *hba)
@@ -9338,13 +9394,19 @@ static int ufshcd_devfreq_target(struct device *dev,
 {
 	int ret = 0;
 	struct ufs_hba *hba = dev_get_drvdata(dev);
+<<<<<<< /data/w2017/kernel/drivers/scsi/ufs/ufshcd.c
 	unsigned long irq_flags;
 	ktime_t start;
 	bool scale_up, sched_clk_scaling_suspend_work = false;
+=======
+	bool release_clk_hold = false;
+	unsigned long irq_flags;
+>>>>>>> /data/w2017/ref/linux-3.18.140/drivers/scsi/ufs/ufshcd.c
 
 	if (!ufshcd_is_clkscaling_supported(hba))
 		return -EINVAL;
 
+<<<<<<< /data/w2017/kernel/drivers/scsi/ufs/ufshcd.c
 	if ((*freq > 0) && (*freq < UINT_MAX)) {
 		dev_err(hba->dev, "%s: invalid freq = %lu\n", __func__, *freq);
 		return -EINVAL;
@@ -9379,6 +9441,44 @@ out:
 			   &hba->clk_scaling.suspend_work);
 
 	return ret;
+=======
+	spin_lock_irqsave(hba->host->host_lock, irq_flags);
+	if (ufshcd_eh_in_progress(hba)) {
+		spin_unlock_irqrestore(hba->host->host_lock, irq_flags);
+		return 0;
+	}
+
+	if (ufshcd_is_clkgating_allowed(hba) &&
+	    (hba->clk_gating.state != CLKS_ON)) {
+		if (cancel_delayed_work(&hba->clk_gating.gate_work)) {
+			/* hold the vote until the scaling work is completed */
+			hba->clk_gating.active_reqs++;
+			release_clk_hold = true;
+			hba->clk_gating.state = CLKS_ON;
+		} else {
+			/*
+			 * Clock gating work seems to be running in parallel
+			 * hence skip scaling work to avoid deadlock between
+			 * current scaling work and gating work.
+			 */
+			spin_unlock_irqrestore(hba->host->host_lock, irq_flags);
+			return 0;
+		}
+	}
+	spin_unlock_irqrestore(hba->host->host_lock, irq_flags);
+
+	if (*freq == UINT_MAX)
+		err = ufshcd_scale_clks(hba, true);
+	else if (*freq == 0)
+		err = ufshcd_scale_clks(hba, false);
+
+	spin_lock_irqsave(hba->host->host_lock, irq_flags);
+	if (release_clk_hold)
+		__ufshcd_release(hba);
+	spin_unlock_irqrestore(hba->host->host_lock, irq_flags);
+
+	return err;
+>>>>>>> /data/w2017/ref/linux-3.18.140/drivers/scsi/ufs/ufshcd.c
 }
 
 static int ufshcd_devfreq_get_dev_status(struct device *dev,

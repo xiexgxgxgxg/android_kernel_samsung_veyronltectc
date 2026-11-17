@@ -83,7 +83,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
 
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0)
-		return -ENODEV;
+		return irq;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res)
@@ -121,6 +121,9 @@ static int xhci_plat_probe(struct platform_device *pdev)
 		ret = clk_prepare_enable(clk);
 		if (ret)
 			goto put_hcd;
+	} else if (PTR_ERR(clk) == -EPROBE_DEFER) {
+		ret = -EPROBE_DEFER;
+		goto put_hcd;
 	}
 
 	if (pdev->dev.parent)
@@ -203,7 +206,11 @@ static int xhci_plat_remove(struct platform_device *dev)
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
 	struct clk *clk = xhci->clk;
 
+<<<<<<< /data/w2017/kernel/drivers/usb/host/xhci-plat.c
 	pm_runtime_disable(&dev->dev);
+=======
+	xhci->xhc_state |= XHCI_STATE_REMOVING;
+>>>>>>> /data/w2017/ref/linux-3.18.140/drivers/usb/host/xhci-plat.c
 
 	usb_remove_hcd(xhci->shared_hcd);
 	usb_put_hcd(xhci->shared_hcd);

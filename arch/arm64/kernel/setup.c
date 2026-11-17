@@ -93,6 +93,7 @@ unsigned int compat_elf_hwcap2 __read_mostly;
 #endif
 
 DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+<<<<<<< /data/w2017/kernel/arch/arm64/kernel/setup.c
 unsigned int system_rev;
 EXPORT_SYMBOL(system_rev);
 
@@ -101,6 +102,8 @@ EXPORT_SYMBOL(boot_reason);
 
 unsigned int cold_boot;
 EXPORT_SYMBOL(cold_boot);
+=======
+>>>>>>> /data/w2017/ref/linux-3.18.140/arch/arm64/kernel/setup.c
 
 static const char *cpu_name;
 phys_addr_t __fdt_pointer __initdata;
@@ -549,6 +552,10 @@ static int c_show(struct seq_file *m, void *v)
 		seq_printf(m, "model name\t: %s rev %d (%s)\n",
 			   cpu_name, cpuid & 15, ELF_PLATFORM);
 #endif
+
+		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
+			   loops_per_jiffy / (500000UL/HZ),
+			   loops_per_jiffy / (5000UL/HZ) % 100);
 
 		/*
 		 * Dump out the common processor features in a single line.
