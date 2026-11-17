@@ -462,10 +462,7 @@ struct ubi_debug_info {
  * @fm_eba_sem: allows ubi_update_fastmap() to block EBA table changes
  * @fm_work: fastmap work queue
  * @fm_work_scheduled: non-zero if fastmap work was scheduled
-<<<<<<< /data/w2017/kernel/drivers/mtd/ubi/ubi.h
-=======
  * @fast_attach: non-zero if UBI was attached by fastmap
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/mtd/ubi/ubi.h
  *
  * @used: RB-tree of used physical eraseblocks
  * @erroneous: RB-tree of erroneous used physical eraseblocks
@@ -477,12 +474,7 @@ struct ubi_debug_info {
  * @pq_head: protection queue head
  * @wl_lock: protects the @used, @free, @pq, @pq_head, @lookuptbl, @move_from,
  *	     @move_to, @move_to_put @erase_pending, @wl_scheduled, @works,
-<<<<<<< /data/w2017/kernel/drivers/mtd/ubi/ubi.h
- *	     @erroneous, @erroneous_peb_count, @fm_work_scheduled, @fm_pool,
- *	     and @fm_wl_pool fields
-=======
  *	     @erroneous, @erroneous_peb_count, and @fm_work_scheduled fields
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/mtd/ubi/ubi.h
  * @move_mutex: serializes eraseblock moves
  * @work_sem: used to wait for all the scheduled works to finish and prevent
  * new works from being submitted
@@ -578,10 +570,7 @@ struct ubi_device {
 	size_t fm_size;
 	struct work_struct fm_work;
 	int fm_work_scheduled;
-<<<<<<< /data/w2017/kernel/drivers/mtd/ubi/ubi.h
-=======
 	int fast_attach;
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/mtd/ubi/ubi.h
 
 	/* Wear-leveling sub-system's stuff */
 	struct rb_root used;

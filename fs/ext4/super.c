@@ -412,11 +412,6 @@ static void ext4_handle_error(struct super_block *sb, char* buf)
 		smp_wmb();
 		sb->s_flags |= MS_RDONLY;
 	}
-<<<<<<< /data/w2017/kernel/fs/ext4/super.c
-	if (test_opt(sb, ERRORS_PANIC))
-		panic("EXT4-fs (device %s): panic! %s\n",
-			sb->s_id, buf?buf:"no message");
-=======
 	if (test_opt(sb, ERRORS_PANIC)) {
 		if (EXT4_SB(sb)->s_journal &&
 		  !(EXT4_SB(sb)->s_journal->j_flags & JBD2_REC_ERR))
@@ -424,7 +419,6 @@ static void ext4_handle_error(struct super_block *sb, char* buf)
 		panic("EXT4-fs (device %s): panic forced after error\n",
 			sb->s_id);
 	}
->>>>>>> /data/w2017/ref/linux-3.18.140/fs/ext4/super.c
 }
 
 #define ext4_error_ratelimit(sb)					\
@@ -735,14 +729,8 @@ __acquires(bitlock)
 	}
 
 	ext4_unlock_group(sb, grp);
-<<<<<<< /data/w2017/kernel/fs/ext4/super.c
-	ext4_handle_error(sb, page_buf);
-	if (page_buf)
-		free_page((unsigned long)page_buf);
-=======
 	ext4_commit_super(sb, 1);
 	ext4_handle_error(sb);
->>>>>>> /data/w2017/ref/linux-3.18.140/fs/ext4/super.c
 	/*
 	 * We only get here in the ERRORS_RO case; relocking the group
 	 * may be dangerous, but nothing bad will happen since the

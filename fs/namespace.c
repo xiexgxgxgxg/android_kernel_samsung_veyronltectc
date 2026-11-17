@@ -1119,7 +1119,6 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
 			goto out_free;
 	}
 
-<<<<<<< /data/w2017/kernel/fs/namespace.c
 #ifdef CONFIG_RKP_NS_PROT
 	flags = old->mnt->mnt_flags & ~(MNT_WRITE_HOLD|MNT_MARKED);
 	
@@ -1145,10 +1144,6 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
 	rkp_assign_mnt_flags(mnt->mnt,flags);
 #else
 	mnt->mnt.mnt_flags = old->mnt.mnt_flags & ~(MNT_WRITE_HOLD|MNT_MARKED);
-=======
-	mnt->mnt.mnt_flags = old->mnt.mnt_flags;
-	mnt->mnt.mnt_flags &= ~(MNT_WRITE_HOLD|MNT_MARKED|MNT_INTERNAL);
->>>>>>> /data/w2017/ref/linux-3.18.140/fs/namespace.c
 	/* Don't allow unprivileged users to change mount flags */
 	if (flag & CL_UNPRIVILEGED) {
 		mnt->mnt.mnt_flags |= MNT_LOCK_ATIME;
@@ -1833,16 +1828,12 @@ SYSCALL_DEFINE2(umount, char __user *, name, int, flags)
 		goto dput_and_out;
 	if (!check_mnt(mnt))
 		goto dput_and_out;
-<<<<<<< /data/w2017/kernel/fs/namespace.c
 
 #ifdef CONFIG_RKP_NS_PROT
 	if (mnt->mnt->mnt_flags & MNT_LOCKED)
 #else
 	if (mnt->mnt.mnt_flags & MNT_LOCKED)
 #endif
-=======
-	if (mnt->mnt.mnt_flags & MNT_LOCKED) /* Check optimistically */
->>>>>>> /data/w2017/ref/linux-3.18.140/fs/namespace.c
 		goto dput_and_out;
 	retval = -EPERM;
 	if (flags & MNT_FORCE && !capable(CAP_SYS_ADMIN))
@@ -3681,16 +3672,12 @@ static bool fs_fully_visible(struct file_system_type *type, int *new_mnt_flags)
 		list_for_each_entry(child, &mnt->mnt_mounts, mnt_child) {
 			struct inode *inode = child->mnt_mountpoint->d_inode;
 			/* Only worry about locked mounts */
-<<<<<<< /data/w2017/kernel/fs/namespace.c
 
 #ifdef CONFIG_RKP_NS_PROT
 			if (!(mnt->mnt->mnt_flags & MNT_LOCKED))
 				continue;
 #else
 			if (!(mnt->mnt.mnt_flags & MNT_LOCKED))
-=======
-			if (!(child->mnt.mnt_flags & MNT_LOCKED))
->>>>>>> /data/w2017/ref/linux-3.18.140/fs/namespace.c
 				continue;
 
 #endif

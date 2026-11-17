@@ -72,14 +72,9 @@
 #include <linux/fs_struct.h>
 #include <linux/compat.h>
 #include <linux/ctype.h>
-<<<<<<< /data/w2017/kernel/kernel/auditsc.c
-#include <linux/uaccess.h>
-#include <asm/unistd.h>
-=======
 #include <linux/string.h>
 #include <linux/uaccess.h>
 #include <uapi/linux/limits.h>
->>>>>>> /data/w2017/ref/linux-3.18.140/kernel/auditsc.c
 
 #include "audit.h"
 
@@ -1018,11 +1013,7 @@ static int audit_log_pid_context(struct audit_context *context, pid_t pid,
 }
 
 static void audit_log_execve_info(struct audit_context *context,
-<<<<<<< /data/w2017/kernel/kernel/auditsc.c
-		struct audit_buffer **ab)
-=======
 				  struct audit_buffer **ab)
->>>>>>> /data/w2017/ref/linux-3.18.140/kernel/auditsc.c
 {
 	long len_max;
 	long len_rem;
@@ -1088,11 +1079,7 @@ static void audit_log_execve_info(struct audit_context *context,
 
 			/* fetch as much as we can of the argument */
 			len_tmp = strncpy_from_user(&buf_head[len_buf], p,
-<<<<<<< /data/w2017/kernel/kernel/auditsc.c
-					len_max - len_buf);
-=======
 						    len_max - len_buf);
->>>>>>> /data/w2017/ref/linux-3.18.140/kernel/auditsc.c
 			if (len_tmp == -EFAULT) {
 				/* unable to copy from userspace */
 				send_sig(SIGKILL, current, 0);
@@ -1111,19 +1098,11 @@ static void audit_log_execve_info(struct audit_context *context,
 				require_data = false;
 				if (!encode)
 					encode = audit_string_contains_control(
-<<<<<<< /data/w2017/kernel/kernel/auditsc.c
-							buf, len_tmp);
-				/* try to use a trusted value for len_full */
-				if (len_full < len_max)
-					len_full = (encode ?
-							len_tmp * 2 : len_tmp);
-=======
 								buf, len_tmp);
 				/* try to use a trusted value for len_full */
 				if (len_full < len_max)
 					len_full = (encode ?
 						    len_tmp * 2 : len_tmp);
->>>>>>> /data/w2017/ref/linux-3.18.140/kernel/auditsc.c
 				p += len_tmp + 1;
 			}
 			len_buf += len_tmp;
@@ -1143,11 +1122,7 @@ static void audit_log_execve_info(struct audit_context *context,
 				len_rem = len_max;
 				audit_log_end(*ab);
 				*ab = audit_log_start(context,
-<<<<<<< /data/w2017/kernel/kernel/auditsc.c
-						GFP_KERNEL, AUDIT_EXECVE);
-=======
 						      GFP_KERNEL, AUDIT_EXECVE);
->>>>>>> /data/w2017/ref/linux-3.18.140/kernel/auditsc.c
 				if (!*ab)
 					goto out;
 			}
@@ -1155,11 +1130,7 @@ static void audit_log_execve_info(struct audit_context *context,
 			/* create the non-arg portion of the arg record */
 			len_tmp = 0;
 			if (require_data || (iter > 0) ||
-<<<<<<< /data/w2017/kernel/kernel/auditsc.c
-					((len_abuf + sizeof(abuf)) > len_rem)) {
-=======
 			    ((len_abuf + sizeof(abuf)) > len_rem)) {
->>>>>>> /data/w2017/ref/linux-3.18.140/kernel/auditsc.c
 				if (iter == 0) {
 					len_tmp += snprintf(&abuf[len_tmp],
 							sizeof(abuf) - len_tmp,
@@ -1167,21 +1138,12 @@ static void audit_log_execve_info(struct audit_context *context,
 							arg, len_full);
 				}
 				len_tmp += snprintf(&abuf[len_tmp],
-<<<<<<< /data/w2017/kernel/kernel/auditsc.c
-						sizeof(abuf) - len_tmp,
-						" a%d[%d]=", arg, iter++);
-			} else
-				len_tmp += snprintf(&abuf[len_tmp],
-						sizeof(abuf) - len_tmp,
-						" a%d=", arg);
-=======
 						    sizeof(abuf) - len_tmp,
 						    " a%d[%d]=", arg, iter++);
 			} else
 				len_tmp += snprintf(&abuf[len_tmp],
 						    sizeof(abuf) - len_tmp,
 						    " a%d=", arg);
->>>>>>> /data/w2017/ref/linux-3.18.140/kernel/auditsc.c
 			WARN_ON(len_tmp >= sizeof(abuf));
 			abuf[sizeof(abuf) - 1] = '\0';
 

@@ -377,12 +377,9 @@ int snd_timer_close(struct snd_timer_instance *timeri)
 		}
 		spin_unlock(&timer->lock);
 		spin_unlock_irq(&slave_active_lock);
-<<<<<<< /data/w2017/kernel/sound/core/timer.c
-=======
 		/* release a card refcount for safe disconnection */
 		if (timer->card)
 			put_device(&timer->card->card_dev);
->>>>>>> /data/w2017/ref/linux-3.18.140/sound/core/timer.c
 		mutex_unlock(&register_mutex);
 	}
  out:
@@ -508,11 +505,8 @@ static int snd_timer_start_slave(struct snd_timer_instance *timeri,
 		spin_lock(&timeri->timer->lock);
 		list_add_tail(&timeri->active_list,
 			      &timeri->master->slave_active_head);
-<<<<<<< /data/w2017/kernel/sound/core/timer.c
-=======
 		snd_timer_notify1(timeri, start ? SNDRV_TIMER_EVENT_START :
 				  SNDRV_TIMER_EVENT_CONTINUE);
->>>>>>> /data/w2017/ref/linux-3.18.140/sound/core/timer.c
 		spin_unlock(&timeri->timer->lock);
 	}
 	spin_unlock_irqrestore(&slave_active_lock, flags);
@@ -526,22 +520,6 @@ static int snd_timer_stop1(struct snd_timer_instance *timeri, bool stop)
 	int result = 0;
 	unsigned long flags;
 
-<<<<<<< /data/w2017/kernel/sound/core/timer.c
-	if (snd_BUG_ON(!timeri))
-		return -ENXIO;
-
-	if (timeri->flags & SNDRV_TIMER_IFLG_SLAVE) {
-		if (!keep_flag) {
-			spin_lock_irqsave(&slave_active_lock, flags);
-			timeri->flags &= ~SNDRV_TIMER_IFLG_RUNNING;
-			list_del_init(&timeri->ack_list);
-			list_del_init(&timeri->active_list);
-			spin_unlock_irqrestore(&slave_active_lock, flags);
-		}
-		goto __end;
-	}
-=======
->>>>>>> /data/w2017/ref/linux-3.18.140/sound/core/timer.c
 	timer = timeri->timer;
 	if (!timer)
 		return -EINVAL;
@@ -778,13 +756,8 @@ void snd_timer_interrupt(struct snd_timer * timer, unsigned long ticks_left)
 			ti->cticks = ti->ticks;
 		} else {
 			ti->flags &= ~SNDRV_TIMER_IFLG_RUNNING;
-<<<<<<< /data/w2017/kernel/sound/core/timer.c
-			if (--timer->running)
-				list_del_init(&ti->active_list);
-=======
 			--timer->running;
 			list_del_init(&ti->active_list);
->>>>>>> /data/w2017/ref/linux-3.18.140/sound/core/timer.c
 		}
 		if ((timer->hw.flags & SNDRV_TIMER_HW_TASKLET) ||
 		    (ti->flags & SNDRV_TIMER_IFLG_FAST))
@@ -1909,11 +1882,7 @@ static long __snd_timer_user_ioctl(struct file *file, unsigned int cmd,
 	{
 		int xarg;
 
-<<<<<<< /data/w2017/kernel/sound/core/timer.c
-		if (tu->timeri)
-=======
 		if (tu->timeri)	/* too late */
->>>>>>> /data/w2017/ref/linux-3.18.140/sound/core/timer.c
 			return -EBUSY;
 		if (get_user(xarg, p))
 			return -EFAULT;
