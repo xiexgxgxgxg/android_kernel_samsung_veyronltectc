@@ -18,6 +18,8 @@
 # If the output of arm-eabi-readelf changes in future, this script might need changes.
 # 
 # Pre-conditions : $READELF, $HOSTCC variables are set.
+# The helper links with -fuse-ld=lld: the Lineage kernel PATH is hermetic and
+# does not contain the host ld.
 #
 # 
 
@@ -253,7 +255,7 @@ fi
 
 #start patching vmlinux with static patcher, temporary put it here 
 rm -f kaslr_fips
-$HOSTCC -o kaslr_fips  $srctree/scripts/kaslr_fips.c
+$HOSTCC -fuse-ld=lld -o kaslr_fips  $srctree/scripts/kaslr_fips.c
 retval=$?
 if [ $retval -ne 0 ]; then
 	echo "$0 : $HOSTCC returned error"
@@ -261,7 +263,7 @@ if [ $retval -ne 0 ]; then
 fi
 
 rm -f fips_crypto_utils
-$HOSTCC -o fips_crypto_utils $srctree/scripts/fips_crypto_utils.c
+$HOSTCC -fuse-ld=lld -o fips_crypto_utils $srctree/scripts/fips_crypto_utils.c
 retval=$?
 if [ $retval -ne 0 ]; then
 	echo "$0 : $HOSTCC returned error"
