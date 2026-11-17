@@ -103,18 +103,8 @@ int blkcipher_walk_done(struct blkcipher_desc *desc,
 	unsigned int n; /* bytes processed */
 	bool more;
 
-<<<<<<< /data/w2017/kernel/crypto/blkcipher.c
-#ifdef CONFIG_CRYPTO_FIPS
-	if (unlikely(in_fips_err())) 
-		return (-EACCES);
-#endif
-
-	if (likely(err >= 0)) {
-		unsigned int n = walk->nbytes - err;
-=======
 	if (unlikely(err < 0))
 		goto finish;
->>>>>>> /data/w2017/ref/linux-3.18.140/crypto/blkcipher.c
 
 	n = walk->nbytes - err;
 	walk->total -= n;

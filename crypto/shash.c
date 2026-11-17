@@ -315,18 +315,9 @@ int shash_ahash_digest(struct ahash_request *req, struct shash_desc *desc)
 	unsigned int offset;
 	int err;
 
-<<<<<<< /data/w2017/kernel/crypto/shash.c
-#ifdef CONFIG_CRYPTO_FIPS
-	if (unlikely(in_fips_err()))
-		return -EACCES;
-#endif
-
-	if (nbytes < min(sg->length, ((unsigned int)(PAGE_SIZE)) - offset)) {
-=======
 	if (nbytes &&
 	    (sg = req->src, offset = sg->offset,
 	     nbytes < min(sg->length, ((unsigned int)(PAGE_SIZE)) - offset))) {
->>>>>>> /data/w2017/ref/linux-3.18.140/crypto/shash.c
 		void *data;
 
 		data = kmap_atomic(sg_page(sg));

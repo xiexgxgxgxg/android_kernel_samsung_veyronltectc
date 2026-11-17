@@ -110,18 +110,8 @@ int ablkcipher_walk_done(struct ablkcipher_request *req,
 	unsigned int n; /* bytes processed */
 	bool more;
 
-<<<<<<< /data/w2017/kernel/crypto/ablkcipher.c
-#ifdef CONFIG_CRYPTO_FIPS
-	if (unlikely(in_fips_err()))
-		return -EACCES;
-#endif
-
-	if (likely(err >= 0)) {
-		unsigned int n = walk->nbytes - err;
-=======
 	if (unlikely(err < 0))
 		goto finish;
->>>>>>> /data/w2017/ref/linux-3.18.140/crypto/ablkcipher.c
 
 	n = walk->nbytes - err;
 	walk->total -= n;

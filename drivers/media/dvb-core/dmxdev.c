@@ -4433,13 +4433,7 @@ static int dvb_demux_do_ioctl(struct file *file,
 		break;
 
 	default:
-<<<<<<< /data/w2017/kernel/drivers/media/dvb-core/dmxdev.c
-		pr_err("%s: unknown ioctl code (0x%x)\n",
-			__func__, cmd);
-		ret = -ENOIOCTLCMD;
-=======
 		ret = -ENOTTY;
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/media/dvb-core/dmxdev.c
 		break;
 	}
 	mutex_unlock(&dmxdev->mutex);
