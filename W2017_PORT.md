@@ -162,3 +162,43 @@ conflict blocks are resolved by side, the *non-conflicting* regions still come
 from whichever side the automatic merge chose. Picking per hunk inside a
 vendor-forked file leaves the file internally inconsistent. Decide per file:
 either take the whole file from one side, or merge it by hand end to end.
+
+## Milestone: the 3.18.140 kernel boots TWRP (2026-11-18)
+
+```
+Linux version 3.18.140-g2d09fb3de-dirty #31 SMP PREEMPT aarch64
+TWRP 3.7.0_9-veyronltectc-wip   ro.product.device = veyronltectc
+```
+
+Confirmed on the device, over adb:
+
+| item | state |
+|---|---|
+| UFS | `sda` 62 GB, all partitions present; `sdb`, `sdc` too |
+| microSD | `mmcblk0` + `mmcblk0p1` |
+| display | `/dev/graphics/fb0`, mode `U:1080x1920p-60` |
+| input | `event0`..`event8` |
+| userspace | `recovery` and `adbd` running |
+| persistent log | `sdlog: raw mmc ok, capacity 1943552 sectors, region 1927168` and `SDLG` on the card |
+
+### What made the difference
+
+`drivers/mmc/` had been merged per hunk, so Samsung's `sdhci-msm` was sitting on
+top of an upstream mmc core.  Taking the whole directory from the Samsung
+baseline (the same rule already applied to ion, dwc3 and the UFS stack) gave a
+working host.  `mmc_first_sd_card()` is re-added on top for veyron_sdlog.
+
+### Method notes that wasted hours tonight
+
+* **Reaching an initcall proves only that the previous one returned.**  It says
+  nothing about whether that probe succeeded, so "initcall N reached" must not
+  be reported as "driver N works".
+* **Any probe that performs block I/O during the initcall sweep perturbs the
+  boot** enough to hide the real behaviour.  A persdata writer that was active
+  from level 6 onward invalidated five bisection runs before this was noticed.
+* **A one-bit channel needs an unambiguous read-out.**  "2 s bite vs 90 s bite"
+  is fine; "1 s bite vs the watchdog's natural 20 s" is not, because the two
+  windows overlap.
+* The bootloader watchdog can be used to keep the board alive indefinitely
+  (`0x9830008 = 0` at the top of `start_kernel`), which is what proved the
+  reset is watchdog driven and not `CONFIG_PANIC_TIMEOUT=5`.
