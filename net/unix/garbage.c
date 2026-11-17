@@ -152,10 +152,7 @@ void unix_notinflight(struct user_struct *user, struct file *fp)
 	if (s) {
 		struct unix_sock *u = unix_sk(s);
 
-<<<<<<< /data/w2017/kernel/net/unix/garbage.c
-=======
 		BUG_ON(!atomic_long_read(&u->inflight));
->>>>>>> /data/w2017/ref/linux-3.18.140/net/unix/garbage.c
 		BUG_ON(list_empty(&u->link));
 
 		if (atomic_long_dec_and_test(&u->inflight))

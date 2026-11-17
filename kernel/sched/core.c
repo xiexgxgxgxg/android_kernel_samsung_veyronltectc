@@ -3459,13 +3459,9 @@ void set_task_cpu(struct task_struct *p, unsigned int new_cpu)
 		if (p->sched_class->migrate_task_rq)
 			p->sched_class->migrate_task_rq(p, new_cpu);
 		p->se.nr_migrations++;
-<<<<<<< /data/w2017/kernel/kernel/sched/core.c
 		perf_sw_event(PERF_COUNT_SW_CPU_MIGRATIONS, 1, NULL, 0);
 
 		fixup_busy_time(p, new_cpu);
-=======
-		perf_sw_event_sched(PERF_COUNT_SW_CPU_MIGRATIONS, 1, 0);
->>>>>>> /data/w2017/ref/linux-3.18.140/kernel/sched/core.c
 	}
 
 	__set_task_cpu(p, new_cpu);
@@ -7200,13 +7196,9 @@ void show_state_filter(unsigned long state_filter)
 			sched_show_task(p);
 	}
 
-<<<<<<< /data/w2017/kernel/kernel/sched/core.c
 	touch_all_softlockup_watchdogs();
 
 #ifdef CONFIG_SYSRQ_SCHED_DEBUG
-=======
-#ifdef CONFIG_SCHED_DEBUG
->>>>>>> /data/w2017/ref/linux-3.18.140/kernel/sched/core.c
 	sysrq_sched_debug_show();
 #endif
 	rcu_read_unlock();

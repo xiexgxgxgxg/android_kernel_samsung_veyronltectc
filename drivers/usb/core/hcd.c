@@ -2539,11 +2539,8 @@ static void hcd_release(struct kref *kref)
 	struct usb_hcd *hcd = container_of (kref, struct usb_hcd, kref);
 
 	mutex_lock(&usb_port_peer_mutex);
-<<<<<<< /data/w2017/kernel/drivers/usb/core/hcd.c
 	if (hcd == hcd->primary_hcd)
 		kfree(hcd->bandwidth_mutex);
-=======
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/usb/core/hcd.c
 	if (hcd->shared_hcd) {
 		struct usb_hcd *peer = hcd->shared_hcd;
 
