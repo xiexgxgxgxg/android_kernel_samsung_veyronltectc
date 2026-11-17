@@ -21,7 +21,7 @@ quiet_cmd_hzfile = HZFILE  $@
       cmd_hzfile = echo "hz=$(CONFIG_HZ)" > $@
 
 targets += hz.bc
-$(obj)/hz.bc: $(objtree)/include/config/hz.h FORCE
+$(obj)/hz.bc: FORCE
 	$(call if_changed,hzfile)
 
 quiet_cmd_bc  = BC      $@
