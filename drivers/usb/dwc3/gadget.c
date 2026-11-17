@@ -630,7 +630,6 @@ static int __dwc3_gadget_ep_enable(struct dwc3_ep *dep,
 		struct dwc3_trb	*trb_st_hw;
 		struct dwc3_trb	*trb_link;
 
-<<<<<<< /data/w2017/kernel/drivers/usb/dwc3/gadget.c
 		ret = dwc3_gadget_set_xfer_resource(dwc, dep);
 		if (ret) {
 			dev_err(dwc->dev, "set_xfer_resource() failed for %s\n",
@@ -638,8 +637,6 @@ static int __dwc3_gadget_ep_enable(struct dwc3_ep *dep,
 			return ret;
 		}
 
-=======
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/usb/dwc3/gadget.c
 		dep->endpoint.desc = desc;
 		dep->comp_desc = comp_desc;
 		dep->type = usb_endpoint_type(desc);
@@ -2193,7 +2190,6 @@ static int __dwc3_gadget_start(struct dwc3 *dwc)
 	}
 	dwc3_writel(dwc->regs, DWC3_DCFG, reg);
 
-<<<<<<< /data/w2017/kernel/drivers/usb/dwc3/gadget.c
 	/* Programs the number of outstanding pipelined transfer requests
 	 * the AXI master pushes to the AXI slave.
 	 */
@@ -2206,8 +2202,6 @@ static int __dwc3_gadget_start(struct dwc3 *dwc)
 
 	dwc->start_config_issued = false;
 
-=======
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/usb/dwc3/gadget.c
 	/* Start with SuperSpeed Default */
 	dwc3_gadget_ep0_desc.wMaxPacketSize = cpu_to_le16(512);
 
@@ -2435,14 +2429,8 @@ static void dwc3_gadget_free_endpoints(struct dwc3 *dwc)
 /* -------------------------------------------------------------------------- */
 
 static int __dwc3_cleanup_done_trbs(struct dwc3 *dwc, struct dwc3_ep *dep,
-<<<<<<< /data/w2017/kernel/drivers/usb/dwc3/gadget.c
 		struct dwc3_request *req, struct dwc3_trb *trb, unsigned length,
 		const struct dwc3_event_depevt *event, int status)
-=======
-		struct dwc3_request *req, struct dwc3_trb *trb,
-		const struct dwc3_event_depevt *event, int status,
-		int chain)
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/usb/dwc3/gadget.c
 {
 	unsigned int		count;
 	unsigned int		s_pkt = 0;
@@ -2513,7 +2501,6 @@ static int __dwc3_cleanup_done_trbs(struct dwc3 *dwc, struct dwc3_ep *dep,
 			s_pkt = 1;
 	}
 
-<<<<<<< /data/w2017/kernel/drivers/usb/dwc3/gadget.c
 	/*
 	 * We assume here we will always receive the entire data block
 	 * which we should receive. Meaning, if we program RX to
@@ -2523,9 +2510,6 @@ static int __dwc3_cleanup_done_trbs(struct dwc3 *dwc, struct dwc3_ep *dep,
 	 */
 	req->request.actual += length - count;
 	if (s_pkt)
-=======
-	if (s_pkt && !chain)
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/usb/dwc3/gadget.c
 		return 1;
 	if ((event->status & DEPEVT_STATUS_LST) &&
 			(trb->ctrl & (DWC3_TRB_CTRL_LST |
@@ -2544,11 +2528,7 @@ static int dwc3_cleanup_done_reqs(struct dwc3 *dwc, struct dwc3_ep *dep,
 	struct dwc3_trb		*trb;
 	unsigned int		slot;
 	unsigned int		i;
-<<<<<<< /data/w2017/kernel/drivers/usb/dwc3/gadget.c
 	unsigned int		trb_len;
-=======
-	int			count = 0;
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/usb/dwc3/gadget.c
 	int			ret;
 
 	do {
@@ -2561,14 +2541,10 @@ static int dwc3_cleanup_done_reqs(struct dwc3 *dwc, struct dwc3_ep *dep,
 			return 1;
 		}
 
-<<<<<<< /data/w2017/kernel/drivers/usb/dwc3/gadget.c
 		/* Make sure that not to queue any TRB if HWO bit is set. */
 		if (req->trb->ctrl & DWC3_TRB_CTRL_HWO)
 			return 0;
 
-=======
-		chain = req->request.num_mapped_sgs > 0;
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/usb/dwc3/gadget.c
 		i = 0;
 		do {
 			slot = req->start_slot + i;
@@ -2585,16 +2561,11 @@ static int dwc3_cleanup_done_reqs(struct dwc3 *dwc, struct dwc3_ep *dep,
 				trb_len = req->request.length;
 
 			ret = __dwc3_cleanup_done_trbs(dwc, dep, req, trb,
-<<<<<<< /data/w2017/kernel/drivers/usb/dwc3/gadget.c
 					trb_len, event, status);
-=======
-					event, status, chain);
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/usb/dwc3/gadget.c
 			if (ret)
 				break;
 		}while (++i < req->request.num_mapped_sgs);
 
-<<<<<<< /data/w2017/kernel/drivers/usb/dwc3/gadget.c
 		if (req->ztrb) {
 			trb = req->ztrb;
 			if ((event->status & DEPEVT_STATUS_LST) &&
@@ -2606,16 +2577,6 @@ static int dwc3_cleanup_done_reqs(struct dwc3 *dwc, struct dwc3_ep *dep,
 					(trb->ctrl & DWC3_TRB_CTRL_IOC))
 				ret = 1;
 		}
-=======
-		/*
-		 * We assume here we will always receive the entire data block
-		 * which we should receive. Meaning, if we program RX to
-		 * receive 4K but we receive only 2K, we assume that's all we
-		 * should receive and we simply bounce the request back to the
-		 * gadget driver for further processing.
-		 */
-		req->request.actual += req->request.length - count;
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/usb/dwc3/gadget.c
 		dwc3_gadget_giveback(dep, req, status);
 
 		/* EP possibly disabled during giveback? */
@@ -2647,16 +2608,9 @@ static int dwc3_cleanup_done_reqs(struct dwc3 *dwc, struct dwc3_ep *dep,
 		return 1;
 	}
 
-<<<<<<< /data/w2017/kernel/drivers/usb/dwc3/gadget.c
 	if ((event->status & DEPEVT_STATUS_IOC) &&
 			(trb->ctrl & DWC3_TRB_CTRL_IOC))
 		return 0;
-=======
-	if (usb_endpoint_xfer_isoc(dep->endpoint.desc))
-		if ((event->status & DEPEVT_STATUS_IOC) &&
-				(trb->ctrl & DWC3_TRB_CTRL_IOC))
-			return 0;
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/usb/dwc3/gadget.c
 	return 1;
 }
 

@@ -508,10 +508,6 @@ retry:
 						 pnum, vol_id, lnum);
 					err = -EBADMSG;
 				} else {
-<<<<<<< /data/w2017/kernel/drivers/mtd/ubi/eba.c
-					err = -EINVAL;
-					ubi_ro_mode(ubi);
-=======
 					/*
 					 * Ending up here in the non-Fastmap case
 					 * is a clear bug as the VID header had to
@@ -531,7 +527,6 @@ retry:
 						err = -EINVAL;
 						ubi_ro_mode(ubi);
 					}
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/mtd/ubi/eba.c
 				}
 			}
 			goto out_free;
@@ -1088,16 +1083,10 @@ retry:
 		goto write_error;
 	}
 
-<<<<<<< /data/w2017/kernel/drivers/mtd/ubi/eba.c
-	old_pnum = vol->eba_tbl[lnum];
-	vol->eba_tbl[lnum] = pnum;
-	up_read(&ubi->fm_eba_sem);
-=======
 	down_read(&ubi->fm_sem);
 	old_pnum = vol->eba_tbl[lnum];
 	vol->eba_tbl[lnum] = pnum;
 	up_read(&ubi->fm_sem);
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/mtd/ubi/eba.c
 
 	if (old_pnum >= 0) {
 		err = ubi_wl_put_peb(ubi, vol_id, lnum, old_pnum, 0);

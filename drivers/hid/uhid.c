@@ -25,11 +25,8 @@
 #include <linux/spinlock.h>
 #include <linux/uhid.h>
 #include <linux/wait.h>
-<<<<<<< /data/w2017/kernel/drivers/hid/uhid.c
 #include <linux/fb.h>
-=======
 #include <linux/uaccess.h>
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/hid/uhid.c
 
 #define UHID_NAME	"uhid"
 #define UHID_BUFSIZE	32
@@ -62,9 +59,7 @@ struct uhid_device {
 
 static struct miscdevice uhid_misc;
 
-<<<<<<< /data/w2017/kernel/drivers/hid/uhid.c
 bool lcd_is_on = true;
-=======
 static void uhid_device_add_worker(struct work_struct *work)
 {
 	struct uhid_device *uhid = container_of(work, struct uhid_device, worker);
@@ -79,7 +74,6 @@ static void uhid_device_add_worker(struct work_struct *work)
 		uhid->running = false;
 	}
 }
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/hid/uhid.c
 
 static void uhid_queue(struct uhid_device *uhid, struct uhid_event *ev)
 {

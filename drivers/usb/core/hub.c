@@ -1005,25 +1005,16 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 		device_lock(hub->intfdev);
 
 		/* Was the hub disconnected while we were waiting? */
-<<<<<<< /data/w2017/kernel/drivers/usb/core/hub.c
 		if (hub->disconnected) {
 			device_unlock(hub->intfdev);
 			kref_put(&hub->kref, hub_release);
 			return;
 		}
-=======
-		if (hub->disconnected)
-			goto disconnected;
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/usb/core/hub.c
 		if (type == HUB_INIT2)
 			goto init2;
 		goto init3;
 	}
 	kref_get(&hub->kref);
-<<<<<<< /data/w2017/kernel/drivers/usb/core/hub.c
-=======
-
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/usb/core/hub.c
 	/* The superspeed hub except for root hub has to use Hub Depth
 	 * value as an offset into the route string to locate the bits
 	 * it uses to determine the downstream port number. So hub driver
@@ -1257,14 +1248,9 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 		/* Allow autosuspend if it was suppressed */
  disconnected:
 		usb_autopm_put_interface_async(to_usb_interface(hub->intfdev));
-<<<<<<< /data/w2017/kernel/drivers/usb/core/hub.c
 	
 	if (type == HUB_INIT2 || type == HUB_INIT3)
 		device_unlock(hub->intfdev);
-=======
-		device_unlock(hub->intfdev);
-	}
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/usb/core/hub.c
 
 	kref_put(&hub->kref, hub_release);
 }

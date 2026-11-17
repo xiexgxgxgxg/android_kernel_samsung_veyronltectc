@@ -191,14 +191,10 @@ static void tcp_incr_quickack(struct sock *sk, unsigned int max_quickacks)
 		icsk->icsk_ack.quick = quickacks;
 }
 
-<<<<<<< /data/w2017/kernel/net/ipv4/tcp_input.c
 #ifndef CONFIG_MPTCP
 static 
 #endif
 void tcp_enter_quickack_mode(struct sock *sk)
-=======
-void tcp_enter_quickack_mode(struct sock *sk, unsigned int max_quickacks)
->>>>>>> /data/w2017/ref/linux-3.18.140/net/ipv4/tcp_input.c
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 
@@ -394,7 +390,6 @@ static int __tcp_grow_window(const struct sock *sk, const struct sk_buff *skb)
 static void tcp_grow_window(struct sock *sk, const struct sk_buff *skb)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
-<<<<<<< /data/w2017/kernel/net/ipv4/tcp_input.c
 #ifdef CONFIG_MPTCP
 	struct sock *meta_sk = mptcp(tp) ? mptcp_meta_sk(sk) : sk;
 	struct tcp_sock *meta_tp = tcp_sk(meta_sk);
@@ -409,14 +404,6 @@ static void tcp_grow_window(struct sock *sk, const struct sk_buff *skb)
 	    (int)tp->rcv_ssthresh < tcp_space(sk) &&
 #endif
 	    !sk_under_memory_pressure(sk)) {
-=======
-	int room;
-
-	room = min_t(int, tp->window_clamp, tcp_space(sk)) - tp->rcv_ssthresh;
-
-	/* Check #1 */
-	if (room > 0 && !sk_under_memory_pressure(sk)) {
->>>>>>> /data/w2017/ref/linux-3.18.140/net/ipv4/tcp_input.c
 		int incr;
 
 		/* Check #2. Increase window, if skb with such overhead
@@ -434,7 +421,6 @@ static void tcp_grow_window(struct sock *sk, const struct sk_buff *skb)
 #endif
 		if (incr) {
 			incr = max_t(int, incr, 2 * skb->len);
-<<<<<<< /data/w2017/kernel/net/ipv4/tcp_input.c
 #ifdef CONFIG_MPTCP
 			meta_tp->rcv_ssthresh = min(meta_tp->rcv_ssthresh + incr,
 					            meta_tp->window_clamp);
@@ -442,9 +428,6 @@ static void tcp_grow_window(struct sock *sk, const struct sk_buff *skb)
 			tp->rcv_ssthresh = min(tp->rcv_ssthresh + incr,
 					       tp->window_clamp);
 #endif
-=======
-			tp->rcv_ssthresh += min(room, incr);
->>>>>>> /data/w2017/ref/linux-3.18.140/net/ipv4/tcp_input.c
 			inet_csk(sk)->icsk_ack.quick |= 1;
 		}
 	}
@@ -3447,32 +3430,19 @@ static void tcp_send_challenge_ack(struct sock *sk)
 	/* unprotected vars, we dont care of overwrites */
 	static u32 challenge_timestamp;
 	static unsigned int challenge_count;
-<<<<<<< /data/w2017/kernel/net/ipv4/tcp_input.c
 	u32 now = jiffies / HZ;
 	u32 count;
-=======
-	u32 count, now = jiffies / HZ;
->>>>>>> /data/w2017/ref/linux-3.18.140/net/ipv4/tcp_input.c
 
 	if (now != challenge_timestamp) {
 		u32 half = (sysctl_tcp_challenge_ack_limit + 1) >> 1;
 
 		challenge_timestamp = now;
-<<<<<<< /data/w2017/kernel/net/ipv4/tcp_input.c
 		challenge_count = half +
 				  prandom_u32_max(sysctl_tcp_challenge_ack_limit);
 	}
 	count = challenge_count;
 	if (count > 0) {
 		challenge_count = count - 1;
-=======
-		WRITE_ONCE(challenge_count, half +
-			   prandom_u32_max(sysctl_tcp_challenge_ack_limit));
-	}
-	count = READ_ONCE(challenge_count);
-	if (count > 0) {
-		WRITE_ONCE(challenge_count, count - 1);
->>>>>>> /data/w2017/ref/linux-3.18.140/net/ipv4/tcp_input.c
 		NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_TCPCHALLENGEACK);
 		tcp_send_ack(sk);
 	}
@@ -5723,13 +5693,9 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct tcp_fastopen_cookie foc = { .len = -1 };
 	int saved_clamp = tp->rx_opt.mss_clamp;
-<<<<<<< /data/w2017/kernel/net/ipv4/tcp_input.c
 #ifdef CONFIG_MPTCP
 	struct mptcp_options_received mopt;
 	mptcp_init_mp_opt(&mopt);
-=======
-	bool fastopen_fail;
->>>>>>> /data/w2017/ref/linux-3.18.140/net/ipv4/tcp_input.c
 
 	tcp_parse_options(skb, &tp->rx_opt,
 			  mptcp(tp) ? &tp->mptcp->rx_opt : &mopt, 0, &foc);
@@ -5872,7 +5838,6 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 		fastopen_fail = (tp->syn_fastopen || tp->syn_data) &&
 				tcp_rcv_fastopen_synack(sk, skb, &foc);
 
-<<<<<<< /data/w2017/kernel/net/ipv4/tcp_input.c
 		/* With MPTCP we cannot send data on the third ack due to the
 		 * lack of option-space to combine with an MP_CAPABLE.
 		 */
@@ -5881,15 +5846,6 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 			!mptcp(tp) && (
 #endif
 			sk->sk_write_pending ||
-=======
-		if (!sock_flag(sk, SOCK_DEAD)) {
-			sk->sk_state_change(sk);
-			sk_wake_async(sk, SOCK_WAKE_IO, POLL_OUT);
-		}
-		if (fastopen_fail)
-			return -1;
-		if (sk->sk_write_pending ||
->>>>>>> /data/w2017/ref/linux-3.18.140/net/ipv4/tcp_input.c
 		    icsk->icsk_accept_queue.rskq_defer_accept ||
 		    icsk->icsk_ack.pingpong
 #ifdef CONFIG_MPTCP

@@ -1006,16 +1006,11 @@ out:
  * We are working here with either a clone of the original
  * SKB, or a fresh unique copy made by the retransmit engine.
  */
-<<<<<<< /data/w2017/kernel/net/ipv4/tcp_output.c
 #ifndef CONFIG_MPTCP
 static 
 #endif
 int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb, int clone_it,
 		        gfp_t gfp_mask)
-=======
-static int __tcp_transmit_skb(struct sock *sk, struct sk_buff *skb,
-			      int clone_it, gfp_t gfp_mask, u32 rcv_nxt)
->>>>>>> /data/w2017/ref/linux-3.18.140/net/ipv4/tcp_output.c
 {
 	const struct inet_connection_sock *icsk = inet_csk(sk);
 	struct inet_sock *inet;
@@ -1371,14 +1366,10 @@ int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len,
  * eventually). The difference is that pulled data not copied, but
  * immediately discarded.
  */
-<<<<<<< /data/w2017/kernel/net/ipv4/tcp_output.c
 #ifndef CONFIG_MPTCP
 static 
 #endif
 void __pskb_trim_head(struct sk_buff *skb, int len)
-=======
-static int __pskb_trim_head(struct sk_buff *skb, int len)
->>>>>>> /data/w2017/ref/linux-3.18.140/net/ipv4/tcp_output.c
 {
 	struct skb_shared_info *shinfo;
 	int i, k, eat;
@@ -1420,14 +1411,10 @@ static int __pskb_trim_head(struct sk_buff *skb, int len)
 /* Remove acked data from a packet in the transmit queue. */
 int tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
 {
-<<<<<<< /data/w2017/kernel/net/ipv4/tcp_output.c
 #ifdef CONFIG_MPTCP
 	if (mptcp(tcp_sk(sk)) && !is_meta_sk(sk) && mptcp_is_data_seq(skb))
 		return mptcp_trim_head(sk, skb, len);
 #endif
-=======
-	u32 delta_truesize;
->>>>>>> /data/w2017/ref/linux-3.18.140/net/ipv4/tcp_output.c
 
 	if (skb_unclone(skb, GFP_ATOMIC))
 		return -ENOMEM;

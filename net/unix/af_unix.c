@@ -342,11 +342,7 @@ found:
  */
 
 static int unix_dgram_peer_wake_relay(wait_queue_t *q, unsigned mode, int flags,
-<<<<<<< /data/w2017/kernel/net/unix/af_unix.c
 		void *key)
-=======
-				      void *key)
->>>>>>> /data/w2017/ref/linux-3.18.140/net/unix/af_unix.c
 {
 	struct unix_sock *u;
 	wait_queue_head_t *u_sleep;
@@ -354,11 +350,7 @@ static int unix_dgram_peer_wake_relay(wait_queue_t *q, unsigned mode, int flags,
 	u = container_of(q, struct unix_sock, peer_wake);
 
 	__remove_wait_queue(&unix_sk(u->peer_wake.private)->peer_wait,
-<<<<<<< /data/w2017/kernel/net/unix/af_unix.c
 			q);
-=======
-			    q);
->>>>>>> /data/w2017/ref/linux-3.18.140/net/unix/af_unix.c
 	u->peer_wake.private = NULL;
 
 	/* relaying can only happen while the wq still exists */
@@ -391,11 +383,7 @@ static int unix_dgram_peer_wake_connect(struct sock *sk, struct sock *other)
 }
 
 static void unix_dgram_peer_wake_disconnect(struct sock *sk,
-<<<<<<< /data/w2017/kernel/net/unix/af_unix.c
 		struct sock *other)
-=======
-					    struct sock *other)
->>>>>>> /data/w2017/ref/linux-3.18.140/net/unix/af_unix.c
 {
 	struct unix_sock *u, *u_other;
 
@@ -412,7 +400,6 @@ static void unix_dgram_peer_wake_disconnect(struct sock *sk,
 }
 
 static void unix_dgram_peer_wake_disconnect_wakeup(struct sock *sk,
-<<<<<<< /data/w2017/kernel/net/unix/af_unix.c
 		struct sock *other)
 {
 	unix_dgram_peer_wake_disconnect(sk, other);
@@ -420,15 +407,6 @@ static void unix_dgram_peer_wake_disconnect_wakeup(struct sock *sk,
 			POLLOUT |
 			POLLWRNORM |
 			POLLWRBAND);
-=======
-						   struct sock *other)
-{
-	unix_dgram_peer_wake_disconnect(sk, other);
-	wake_up_interruptible_poll(sk_sleep(sk),
-				   POLLOUT |
-				   POLLWRNORM |
-				   POLLWRBAND);
->>>>>>> /data/w2017/ref/linux-3.18.140/net/unix/af_unix.c
 }
 
 /* preconditions:
@@ -1759,16 +1737,7 @@ restart_locked:
 			goto out_unlock;
 	}
 
-<<<<<<< /data/w2017/kernel/net/unix/af_unix.c
 	if (unlikely(unix_peer(other) != sk && unix_recvq_full(other))) {
-=======
-	/* other == sk && unix_peer(other) != sk if
-	 * - unix_peer(sk) == NULL, destination address bound to sk
-	 * - unix_peer(sk) == sk by time of get but disconnected before lock
-	 */
-	if (other != sk &&
-	    unlikely(unix_peer(other) != sk && unix_recvq_full(other))) {
->>>>>>> /data/w2017/ref/linux-3.18.140/net/unix/af_unix.c
 		if (timeo) {
 			timeo = unix_wait_for_peer(other, timeo);
 
