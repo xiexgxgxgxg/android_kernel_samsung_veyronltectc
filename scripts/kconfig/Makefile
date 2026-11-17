@@ -130,19 +130,12 @@ endif
 
 configfiles=$(wildcard $(srctree)/kernel/configs/$@ $(srctree)/arch/$(SRCARCH)/configs/$@)
 
-<<<<<<< /data/w2017/kernel/scripts/kconfig/Makefile
-%.config: $(obj)/conf
-	$(if $(call configfiles),, $(error No configuration exists for this target on this architecture))
-	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/kconfig/merge_config.sh -m .config $(configfiles)
-	+$(Q)yes "" | $(MAKE) -f $(srctree)/Makefile oldconfig
-=======
 define mergeconfig
 $(if $(wildcard $(objtree)/.config),, $(error You need an existing .config for this target))
 $(if $(call configfiles,$(1)),, $(error No configuration exists for this target on this architecture))
 $(Q)$(CONFIG_SHELL) $(srctree)/scripts/kconfig/merge_config.sh -m -O $(objtree) $(objtree)/.config $(call configfiles,$(1))
 +$(Q)yes "" | $(MAKE) -f $(srctree)/Makefile oldconfig
 endef
->>>>>>> /data/w2017/ref/linux-3.18.140/scripts/kconfig/Makefile
 
 PHONY += kvmconfig
 kvmconfig: kvm_guest.config

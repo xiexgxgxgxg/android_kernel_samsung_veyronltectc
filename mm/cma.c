@@ -33,11 +33,8 @@
 #include <linux/log2.h>
 #include <linux/cma.h>
 #include <linux/highmem.h>
-<<<<<<< /data/w2017/kernel/mm/cma.c
 #include <linux/delay.h>
-=======
 #include <linux/io.h>
->>>>>>> /data/w2017/ref/linux-3.18.140/mm/cma.c
 
 struct cma {
 	unsigned long	base_pfn;

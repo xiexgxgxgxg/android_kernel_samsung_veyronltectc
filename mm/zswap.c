@@ -921,10 +921,6 @@ static int zswap_frontswap_store(unsigned type, pgoff_t offset,
 
 	if (zswap_is_full(ZSWAP_POOL_MAX)) {
 		zswap_pool_limit_hit++;
-<<<<<<< /data/w2017/kernel/mm/zswap.c
-		ret = -ENOMEM;
-		goto reject;
-=======
 		if (zpool_shrink(zswap_pool, 1, NULL)) {
 			zswap_reject_reclaim_fail++;
 			ret = -ENOMEM;
@@ -939,7 +935,6 @@ static int zswap_frontswap_store(unsigned type, pgoff_t offset,
 			ret = -ENOMEM;
 			goto reject;
 		}
->>>>>>> /data/w2017/ref/linux-3.18.140/mm/zswap.c
 	}
 
 	/* allocate entry */

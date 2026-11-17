@@ -1226,12 +1226,6 @@ drop:
 	return 0; /* don't send reset */
 }
 
-<<<<<<< /data/w2017/kernel/net/ipv6/tcp_ipv6.c
-#ifndef CONFIG_MPTCP
-static 
-#endif
-struct sock *tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
-=======
 static void tcp_v6_restore_cb(struct sk_buff *skb)
 {
 	/* We need to move header back to the beginning if xfrm6_policy_check()
@@ -1242,8 +1236,10 @@ static void tcp_v6_restore_cb(struct sk_buff *skb)
 		sizeof(struct inet6_skb_parm));
 }
 
-static struct sock *tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
->>>>>>> /data/w2017/ref/linux-3.18.140/net/ipv6/tcp_ipv6.c
+#ifndef CONFIG_MPTCP
+static
+#endif
+struct sock *tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 					 struct request_sock *req,
 					 struct dst_entry *dst)
 {

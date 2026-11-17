@@ -1148,10 +1148,6 @@ static void pcpu_balance_workfn(struct work_struct *work)
 		pcpu_destroy_chunk(chunk);
 	}
 
-<<<<<<< /data/w2017/kernel/mm/percpu.c
-
-=======
->>>>>>> /data/w2017/ref/linux-3.18.140/mm/percpu.c
 	/* service chunks which requested async area map extension */
 	do {
 		int new_alloc = 0;

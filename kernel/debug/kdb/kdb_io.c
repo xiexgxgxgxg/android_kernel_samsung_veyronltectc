@@ -215,13 +215,8 @@ static char *kdb_read(char *buffer, size_t bufsize)
 	int count;
 	int i;
 	int diag, dtab_count;
-<<<<<<< /data/w2017/kernel/kernel/debug/kdb/kdb_io.c
-	int key;
-	static int last_crlf;
-=======
 	int key, buf_size, ret;
 
->>>>>>> /data/w2017/ref/linux-3.18.140/kernel/debug/kdb/kdb_io.c
 
 	diag = kdbgetintenv("DTABCOUNT", &dtab_count);
 	if (diag)

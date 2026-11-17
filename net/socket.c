@@ -2455,21 +2455,12 @@ int __sys_recvmmsg(int fd, struct mmsghdr __user *mmsg, unsigned int vlen,
 
 	if (err == 0)
 		goto out_put;
-<<<<<<< /data/w2017/kernel/net/socket.c
 
 	if (datagrams == 0) {
 		datagrams = err;
 		goto out_put;
 	}
 
-=======
-
-	if (datagrams == 0) {
-		datagrams = err;
-		goto out_put;
-	}
-
->>>>>>> /data/w2017/ref/linux-3.18.140/net/socket.c
 	/*
 	 * We may return less entries than requested (vlen) if the
 	 * sock is non block and there aren't enough datagrams...
