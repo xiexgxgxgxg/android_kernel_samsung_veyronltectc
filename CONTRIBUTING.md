@@ -64,8 +64,10 @@ Build output.  It is ignored by `.gitignore` and untracked; see
 `vmlinux.o`, `*.o`, `built-in.o`, `Module.symvers`, `include/config/`,
 `include/generated/` and the generated lexer/parser sources.
 
-The top-level `.config` **is** tracked on purpose: it is the kernel
-configuration used for this board.
+The top-level `.config` is **not** tracked.  `arch/arm64/configs/veyronlte_ctc_defconfig`
+is the configuration source of truth.  An out-of-tree build (`O=`, which the
+LineageOS build system uses) refuses to run when `$(srctree)/.config` exists,
+and a tracked `.config` silently goes stale when the defconfig changes.
 
 ## 6. Shell hygiene when scripting commits
 
