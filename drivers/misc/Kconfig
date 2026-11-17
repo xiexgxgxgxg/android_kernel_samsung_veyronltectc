@@ -602,3 +602,11 @@ source "drivers/misc/genwqe/Kconfig"
 source "drivers/misc/echo/Kconfig"
 source "drivers/misc/cxl/Kconfig"
 endmenu
+
+config VEYRON_SDLOG
+	bool "Persist the kernel log to the microSD card"
+	default n
+	help
+	  Keep rewriting the tail of the kernel log into a raw region at the end
+	  of the microSD card every few hundred milliseconds.  Works
+	  independently of UFS and survives a power cycle.
