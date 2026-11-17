@@ -447,6 +447,7 @@ ecryptfs_create(struct inode *directory_inode, struct dentry *ecryptfs_dentry,
 		iput(ecryptfs_inode);
 		goto out;
 	}
+<<<<<<< /data/w2017/kernel/fs/ecryptfs/inode.c
 	unlock_new_inode(ecryptfs_inode);
 
 	crypt_stat = &ecryptfs_inode_to_private(ecryptfs_inode)->crypt_stat;
@@ -458,6 +459,9 @@ ecryptfs_create(struct inode *directory_inode, struct dentry *ecryptfs_dentry,
 	d_instantiate(ecryptfs_dentry, ecryptfs_inode);
 	if(d_unhashed(ecryptfs_dentry))
 		d_rehash(ecryptfs_dentry);
+=======
+	d_instantiate_new(ecryptfs_dentry, ecryptfs_inode);
+>>>>>>> /data/w2017/ref/linux-3.18.140/fs/ecryptfs/inode.c
 out:
 	return rc;
 }

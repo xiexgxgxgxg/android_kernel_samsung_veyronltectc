@@ -1,12 +1,11 @@
 #ifndef __NET_NS_HASH_H__
 #define __NET_NS_HASH_H__
 
-#include <asm/cache.h>
-
-struct net;
+#include <net/net_namespace.h>
 
 static inline u32 net_hash_mix(const struct net *net)
 {
+<<<<<<< /data/w2017/kernel/include/net/netns/hash.h
 #ifdef CONFIG_NET_NS
 	/*
 	 * shift this right to eliminate bits, that are
@@ -17,5 +16,8 @@ static inline u32 net_hash_mix(const struct net *net)
 #else
 	return 0;
 #endif
+=======
+	return net->hash_mix;
+>>>>>>> /data/w2017/ref/linux-3.18.140/include/net/netns/hash.h
 }
 #endif

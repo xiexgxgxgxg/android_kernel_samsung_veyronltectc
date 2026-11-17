@@ -47,11 +47,20 @@ static int mmap_is_legacy(void)
 	return sysctl_legacy_va_layout;
 }
 
+<<<<<<< /data/w2017/kernel/arch/arm64/mm/mmap.c
 unsigned long arch_mmap_rnd(void)
+=======
+static unsigned long mmap_rnd(void)
+>>>>>>> /data/w2017/ref/linux-3.18.140/arch/arm64/mm/mmap.c
 {
 	unsigned long rnd;
 
+<<<<<<< /data/w2017/kernel/arch/arm64/mm/mmap.c
 	rnd = (unsigned long)get_random_int() & STACK_RND_MASK;
+=======
+	if (current->flags & PF_RANDOMIZE)
+		rnd = (long)get_random_int() & STACK_RND_MASK;
+>>>>>>> /data/w2017/ref/linux-3.18.140/arch/arm64/mm/mmap.c
 
 	return rnd << PAGE_SHIFT;
 }

@@ -529,6 +529,7 @@ static void sync_fence_free(struct kref *kref)
 {
 	struct sync_fence *fence = container_of(kref, struct sync_fence, kref);
 	int i;
+<<<<<<< /data/w2017/kernel/drivers/staging/android/sync.c
 	unsigned long flags;
 
 	for (i = 0; i < fence->num_fences; ++i) {
@@ -538,6 +539,11 @@ static void sync_fence_free(struct kref *kref)
 					      &fence->cbs[i].cb);
 		spin_unlock_irqrestore(fence->cbs[i].sync_pt->lock, flags);
 
+=======
+
+	for (i = 0; i < fence->num_fences; ++i) {
+		fence_remove_callback(fence->cbs[i].sync_pt, &fence->cbs[i].cb);
+>>>>>>> /data/w2017/ref/linux-3.18.140/drivers/staging/android/sync.c
 		fence_put(fence->cbs[i].sync_pt);
 	}
 

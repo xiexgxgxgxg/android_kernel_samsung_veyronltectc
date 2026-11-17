@@ -1007,11 +1007,15 @@ struct journal_s
 #define JBD2_ABORT_ON_SYNCDATA_ERR	0x040	/* Abort the journal on file
 						 * data write error in ordered
 						 * mode */
+<<<<<<< /data/w2017/kernel/include/linux/jbd2.h
 #ifdef CONFIG_JOURNAL_DATA_TAG
 #define JBD2_JOURNAL_TAG	0x800	/* Journaling is working in journal */
                                         /* data tagging mode */
 #endif
 
+=======
+#define JBD2_REC_ERR	0x080	/* The errno in the sb has been recorded */
+>>>>>>> /data/w2017/ref/linux-3.18.140/include/linux/jbd2.h
 
 /*
  * Function declarations for the journaling transaction and buffer
@@ -1047,8 +1051,9 @@ void jbd2_update_log_tail(journal_t *journal, tid_t tid, unsigned long block);
 extern void jbd2_journal_commit_transaction(journal_t *);
 
 /* Checkpoint list management */
-void __jbd2_journal_clean_checkpoint_list(journal_t *journal);
+void __jbd2_journal_clean_checkpoint_list(journal_t *journal, bool destroy);
 int __jbd2_journal_remove_checkpoint(struct journal_head *);
+void jbd2_journal_destroy_checkpoint(journal_t *journal);
 void __jbd2_journal_insert_checkpoint(struct journal_head *, transaction_t *);
 
 
