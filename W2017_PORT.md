@@ -138,3 +138,27 @@ conflict blocks in place; `--list` shows the block offsets.
 88 conflicts found, 17 resolved in the first pass (arch/arm64, mmc, ufs,
 crypto, pm, input, dvb), **71 files still carry conflict markers**.  Each is a
 small, local decision; the list is in the commit messages of the batch commits.
+
+## Milestone: the 3.18.140 kernel builds
+
+`Linux version 3.18.140-g42f3dc2e9-dirty ... #4 SMP PREEMPT`, `Image.gz`
+10218403 bytes, md5 `0705d9d524331e3648ecfeebd7466796`.
+
+Fixing the last mile required these deliberate, documented deviations:
+
+| area | change | why |
+|---|---|---|
+| `arch/arm64/include/asm/asm-uaccess.h` | added from 3.18.140 | new file the merge skipped |
+| `net/netfilter/{xt_TCPMSS,xt_RATEEST,xt_dscp,xt_hl}.c`, `include/uapi/linux/netfilter*/{xt_mark,xt_connmark,ipt_ttl,ipt_ecn,ipt_REJECT}.h` | added from 3.18.140 | upstream 3.18.140 renamed `xt_*` sources to upper case; the merged Makefile points at the new names |
+| `CONFIG_RKP_CFP`, `CONFIG_RKP_CFP_JOPP` | **disabled** | Samsung's post-link instrumentation (`scripts/rkp_cfp/instrument.py`) needs a cross `gdb`, which this build host does not have. Reversible once `aarch64-linux-android-gdb` exists. |
+| `scripts/fips_crypto_utils.c` | added `string.h` + two forward declarations | Samsung's host-side FIPS utility, kept working |
+| `fs/proc/base.c` | `smaps_simple` node removed | needs `mem_size_stats.swap_pss`, which 3.18.140 does not have; Samsung-ROM-only convenience |
+| `net/ipv4/tcp_input.c` | re-added `sysctl_tcp_default_init_rwnd` | Samsung sysctl still referenced by `sysctl_net_ipv4.c` |
+| `drivers/staging/android/ion/ion.c`, `drivers/usb/dwc3/gadget.c`, `drivers/usb/dwc3/core.h`, `drivers/usb/gadget/function/{f_acm,f_fs}.c` | taken whole from the Samsung baseline | heavily CAF-forked; mixing an upstream file with the vendor headers produced inconsistent code |
+| `fs/proc/task_mmu.c`, `net/ipv4/tcp_input.c`, `net/ipv4/tcp_output.c`, `drivers/usb/core/hub.c` | taken whole from 3.18.140 | generic code; the Samsung forks there were cosmetic |
+
+Lesson learned (cost me a full rebuild cycle each time): for a file whose
+conflict blocks are resolved by side, the *non-conflicting* regions still come
+from whichever side the automatic merge chose. Picking per hunk inside a
+vendor-forked file leaves the file internally inconsistent. Decide per file:
+either take the whole file from one side, or merge it by hand end to end.
