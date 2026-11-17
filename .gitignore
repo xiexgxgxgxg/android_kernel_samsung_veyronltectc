@@ -39,6 +39,7 @@ uImage
 .tab.c
 .tab.h
 .version
+.config
 .config.old
 .config.cmd
 .localversion
