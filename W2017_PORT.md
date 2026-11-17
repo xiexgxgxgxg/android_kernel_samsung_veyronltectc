@@ -1,8 +1,9 @@
 # W2017 kernel — port notes
 
 > **STATUS: WORK IN PROGRESS.** This is the *stock* Samsung Android 6.0.1 kernel
-> source for the W2017. It is not patched for Android 11 (LineageOS 18.1) yet and
-> will not build a bootable 18.1 kernel as-is.
+> source for the W2017. It boots TWRP and now builds out-of-tree for LineageOS
+> 18.1, but the Android 11 kernel features (configfs USB, quota, memcg, F2FS)
+> are still missing, so it is not expected to boot 18.1 yet.
 
 ## What this is
 
@@ -202,3 +203,24 @@ working host.  `mmc_first_sd_card()` is re-added on top for veyron_sdlog.
 * The bootloader watchdog can be used to keep the board alive indefinitely
   (`0x9830008 = 0` at the top of `start_kernel`), which is what proved the
   reset is watchdog driven and not `CONFIG_PANIC_TIMEOUT=5`.
+
+## Milestone: the kernel builds out-of-tree for LineageOS 18.1 (2026-11-18)
+
+The LineageOS build system compiles the kernel with `O=<out>/KERNEL_OBJ`, which
+this Samsung tree had never supported. These changes make that path work
+without changing the TWRP configuration:
+
+| problem | fix |
+|---|---|
+| `$(srctree)/.config` was tracked, Kbuild refuses an out-of-tree build | `.config` is no longer tracked; `veyronlte_ctc_defconfig` is the source of truth |
+| `scripts/gcc-wrapper.py` was Python 2 | ported to Python 3 |
+| host tools need `-fcommon`; Samsung modpost needs the mismatch check relaxed | board config passes both |
+| host tools could not find a linker in the hermetic PATH | `-fuse-ld=lld` in HOSTCFLAGS and in `kaslr_fips_hmac.sh` |
+| firmware `.gen.S` were committed with relative `.incbin` paths | generated into the output dir from the source tree, generated files untracked |
+| `kernel/time/hz.bc` wanted `include/config/hz.h` | dependency dropped; it only echoes `CONFIG_HZ` |
+| RKP CFP/JOPP instrumentation needs Python 2 and a cross gdb | disabled |
+| `headers_install` missed many UAPI files | display, media and IPA UAPI headers restored from the 3.18 msm8996 baselines |
+| defconfig did not match the verified `.config` | `SEC_RESTRICT_*`, Samsung MTP/SideSync, DUN and NCM-MTU switches synced; `VEYRON_SDLOG` enabled |
+
+The Android 11 userspace gaps (`CONFIG_USB_CONFIGFS`, quota, memcg, F2FS) are
+still open and are the next step before a Lineage boot test.
