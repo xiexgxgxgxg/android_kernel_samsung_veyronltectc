@@ -78,3 +78,63 @@ Missing / needs work:
 `lineage-18.1-caf`) — same Samsung 3.18.20 baseline, already patched for 18.1 on
 msm8996. Cherry-pick the Android-11 enabling commits (gadget configfs, quota,
 memcg, sdcardfs/FUSE, SELinux bits) onto this tree instead of switching base.
+
+---
+
+# 3.18.20 -> 3.18.140 stable bump (clean restart, 2026-11-17)
+
+The earlier attempt (`wip-318140`, now deleted, archived as tag
+`archive/wip-318140`) left the tree half-merged: headers from one release,
+sources from another, so the build failed with whack-a-mole errors and nothing
+could be trusted.
+
+This restart does it properly, from the untouched `W2017KEU1APJ7` baseline.
+
+## Reference sources (content is never taken from a third-party port tree)
+
+| role | source |
+|---|---|
+| merge base | `linux-3.18.20` from kernel.org |
+| merge target | `linux-3.18.140` from kernel.org |
+| ours | this tree (Samsung W2017 source) |
+| architecture reference only | `LineageOS/android_kernel_xiaomi_msm8996` lineage-18.1 |
+| local copies | `/data/w2017/ref/linux-3.18.20`, `.../linux-3.18.140`, `.../android_kernel_xiaomi_msm8996` |
+
+## Method
+
+For every file that 3.18.140 changed:
+
+* `ours == base` (Samsung never touched it) -> copy the 3.18.140 file verbatim
+* `ours != base` -> `git merge-file ours base theirs`
+
+Result on the first pass:
+
+| outcome | count |
+|---|---|
+| taken verbatim from 3.18.140 | 3482 |
+| clean 3-way merge | 410 |
+| conflicts needing a decision | 88 |
+| skipped (file absent in our tree) | 35 |
+
+## Resolution rules
+
+* **Upstream fixed a real defect** (error paths, locking, bounds checks) ->
+  take the upstream side.
+* **Samsung added board/vendor functionality** -> keep our side.
+* **Both touched the same lines** -> merge by hand, keeping the vendor feature
+  and the upstream fix.
+
+Do not resolve whole files by side without reading the hunks: picking "ours"
+blindly dropped the `crypto` error checks, the `crypto/shash` scatterlist fix,
+the `input` key-release-on-remove fix and `direct_complete` reset.
+
+## Tooling
+
+`/data/twrp/w2_audit/pick_conflict.py <file> <ours|theirs> [all|N]` resolves
+conflict blocks in place; `--list` shows the block offsets.
+
+## Status
+
+88 conflicts found, 17 resolved in the first pass (arch/arm64, mmc, ufs,
+crypto, pm, input, dvb), **71 files still carry conflict markers**.  Each is a
+small, local decision; the list is in the commit messages of the batch commits.
