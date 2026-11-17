@@ -13,6 +13,8 @@
 #include <linux/ratelimit.h>
 #include <linux/vmalloc.h>
 #include <linux/init.h>
+
+static int one = 1;
 #include <linux/slab.h>
 #include <linux/kmemleak.h>
 
