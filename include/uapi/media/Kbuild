@@ -21,3 +21,4 @@ header-y += radio-iris-commands.h
 header-y += companion2_reg_map.h
 header-y += companion3_reg_map.h
 header-y += companion3_reg_map_grace.h
+header-y += msm_sde_rotator.h
