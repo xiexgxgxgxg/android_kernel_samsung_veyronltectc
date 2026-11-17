@@ -802,7 +802,6 @@ static int snd_compress_simple_ioctls(struct file *file,
 	case _IOC_NR(SNDRV_COMPRESS_GET_CAPS):
 		retval = snd_compr_get_caps(stream, arg);
 		break;
-<<<<<<< /data/w2017/kernel/sound/core/compress_offload.c
 
 	case _IOC_NR(SNDRV_COMPRESS_GET_CODEC_CAPS):
 		retval = snd_compr_get_codec_caps(stream, arg);
@@ -848,13 +847,6 @@ static long snd_compr_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 
 	mutex_lock(&stream->device->lock);
 	switch (_IOC_NR(cmd)) {
-=======
-#ifndef COMPR_CODEC_CAPS_OVERFLOW
-	case _IOC_NR(SNDRV_COMPRESS_GET_CODEC_CAPS):
-		retval = snd_compr_get_codec_caps(stream, arg);
-		break;
-#endif
->>>>>>> /data/w2017/ref/linux-3.18.140/sound/core/compress_offload.c
 	case _IOC_NR(SNDRV_COMPRESS_SET_PARAMS):
 		retval = snd_compr_set_params(stream, arg);
 		break;

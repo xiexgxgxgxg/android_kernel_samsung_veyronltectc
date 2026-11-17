@@ -127,7 +127,6 @@ static struct usb_device_id ath3k_table[] = {
 	{ USB_DEVICE(0x03F0, 0x311D) },
 
 	/* Atheros AR3012 with sflash firmware*/
-<<<<<<< /data/w2017/kernel/drivers/bluetooth/ath3k.c
 	{ USB_DEVICE(0x0CF3, 0x0036) },
 	{ USB_DEVICE(0x0CF3, 0x3004) },
 	{ USB_DEVICE(0x0CF3, 0x3008) },
@@ -135,7 +134,6 @@ static struct usb_device_id ath3k_table[] = {
 	{ USB_DEVICE(0x0CF3, 0x817a) },
 	{ USB_DEVICE(0x0CF3, 0xe500) },
 	{ USB_DEVICE(0x13d3, 0x3375) },
-=======
 	{ USB_DEVICE(0x0489, 0xe04d) },
 	{ USB_DEVICE(0x0489, 0xe04e) },
 	{ USB_DEVICE(0x0489, 0xe057) },
@@ -145,7 +143,6 @@ static struct usb_device_id ath3k_table[] = {
 	{ USB_DEVICE(0x0489, 0xe078) },
 	{ USB_DEVICE(0x0489, 0xe095) },
 	{ USB_DEVICE(0x04c5, 0x1330) },
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/bluetooth/ath3k.c
 	{ USB_DEVICE(0x04CA, 0x3004) },
 	{ USB_DEVICE(0x04CA, 0x3005) },
 	{ USB_DEVICE(0x04CA, 0x3006) },

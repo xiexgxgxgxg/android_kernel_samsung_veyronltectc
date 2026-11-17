@@ -1257,7 +1257,6 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 
 	req->length = length;
 
-<<<<<<< /data/w2017/kernel/drivers/usb/gadget/function/u_ether.c
 	/* throttle high/super speed IRQ rate back slightly */
 	if (gadget_is_dualspeed(dev->gadget) &&
 			 (dev->gadget->speed == USB_SPEED_HIGH ||
@@ -1275,8 +1274,6 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 		req->no_interrupt = 0;
 	}
 
-=======
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/usb/gadget/function/u_ether.c
 	retval = usb_ep_queue(in, req, GFP_ATOMIC);
 	switch (retval) {
 	default:

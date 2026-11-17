@@ -8,14 +8,7 @@
  * paravirt and debugging variants are added.)
  */
 #undef CONFIG_PARAVIRT
-<<<<<<< /data/w2017/kernel/arch/x86/boot/compressed/misc.h
-#undef CONFIG_KASAN
-#ifdef CONFIG_X86_32
-#define _ASM_X86_DESC_H 1
-#endif
-=======
 #undef CONFIG_PARAVIRT_SPINLOCKS
->>>>>>> /data/w2017/ref/linux-3.18.140/arch/x86/boot/compressed/misc.h
 
 #include <linux/linkage.h>
 #include <linux/screen_info.h>

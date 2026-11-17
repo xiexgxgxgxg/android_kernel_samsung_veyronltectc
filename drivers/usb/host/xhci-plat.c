@@ -206,11 +206,7 @@ static int xhci_plat_remove(struct platform_device *dev)
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
 	struct clk *clk = xhci->clk;
 
-<<<<<<< /data/w2017/kernel/drivers/usb/host/xhci-plat.c
-	pm_runtime_disable(&dev->dev);
-=======
 	xhci->xhc_state |= XHCI_STATE_REMOVING;
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/usb/host/xhci-plat.c
 
 	usb_remove_hcd(xhci->shared_hcd);
 	usb_put_hcd(xhci->shared_hcd);
