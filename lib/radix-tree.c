@@ -33,11 +33,7 @@
 #include <linux/string.h>
 #include <linux/bitops.h>
 #include <linux/rcupdate.h>
-<<<<<<< /data/w2017/kernel/lib/radix-tree.c
-#include <linux/preempt.h>		/* in_interrupt() */
-=======
 #include <linux/preempt_mask.h>		/* in_interrupt() */
->>>>>>> /data/w2017/ref/linux-3.18.140/lib/radix-tree.c
 
 
 /*

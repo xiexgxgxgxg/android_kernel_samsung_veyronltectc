@@ -115,18 +115,10 @@ extern int __bitmap_weight(const unsigned long *bitmap, unsigned int nbits);
 
 extern void bitmap_set(unsigned long *map, unsigned int start, int len);
 extern void bitmap_clear(unsigned long *map, unsigned int start, int len);
-<<<<<<< /data/w2017/kernel/include/linux/bitmap.h
 extern unsigned long bitmap_find_next_zero_area_and_size(unsigned long *map,
 							 unsigned long size,
 							 unsigned long start,
 							 unsigned int *nr);
-extern unsigned long bitmap_find_next_zero_area(unsigned long *map,
-					 unsigned long size,
-					 unsigned long start,
-					 unsigned int nr,
-					 unsigned long align_mask);
-=======
-
 extern unsigned long bitmap_find_next_zero_area_off(unsigned long *map,
 						    unsigned long size,
 						    unsigned long start,
@@ -156,7 +148,6 @@ bitmap_find_next_zero_area(unsigned long *map,
 	return bitmap_find_next_zero_area_off(map, size, start, nr,
 					      align_mask, 0);
 }
->>>>>>> /data/w2017/ref/linux-3.18.140/include/linux/bitmap.h
 
 extern int bitmap_scnprintf(char *buf, unsigned int len,
 			const unsigned long *src, int nbits);

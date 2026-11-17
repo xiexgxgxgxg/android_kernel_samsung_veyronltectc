@@ -243,11 +243,7 @@ static int propagate_one(struct mount *m)
 	if (!is_subdir(mp->m_dentry, m->mnt.mnt_root))
 #endif
 		return 0;
-<<<<<<< /data/w2017/kernel/fs/pnode.c
-	if (m->mnt_group_id && (m->mnt_group_id == last_dest->mnt_group_id)) {
-=======
 	if (peers(m, last_dest)) {
->>>>>>> /data/w2017/ref/linux-3.18.140/fs/pnode.c
 		type = CL_MAKE_SHARED;
 	} else {
 		struct mount *n, *p;

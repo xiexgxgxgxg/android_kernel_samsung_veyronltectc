@@ -291,12 +291,9 @@ static int inet_create(struct net *net, struct socket *sock, int protocol,
 	if (protocol < 0 || protocol >= IPPROTO_MAX)
 		return -EINVAL;
 
-<<<<<<< /data/w2017/kernel/net/ipv4/af_inet.c
 	if (!current_has_network())
 		return -EACCES;
 
-=======
->>>>>>> /data/w2017/ref/linux-3.18.140/net/ipv4/af_inet.c
 	sock->state = SS_UNCONNECTED;
 
 	/* Look for the requested type/protocol pair. */

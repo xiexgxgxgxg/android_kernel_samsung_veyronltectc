@@ -327,12 +327,14 @@ void bitmap_clear(unsigned long *map, unsigned int start, int len)
 EXPORT_SYMBOL(bitmap_clear);
 
 /**
-<<<<<<< /data/w2017/kernel/lib/bitmap.c
- * bitmap_find_next_zero_area_and_size - find a contiguous aligned zero area
+ * bitmap_find_next_zero_area_and_size - find a contiguous zero area and its size
  * @map: The address to base the search on
  * @size: The bitmap size in bits
  * @start: The bitnumber to start searching at
  * @nr: The number of zeroed bits we've found
+ *
+ * Samsung extension kept from the vendor tree; mm/cma.c uses it to learn how
+ * many free bits the run actually had.
  */
 unsigned long bitmap_find_next_zero_area_and_size(unsigned long *map,
 					     unsigned long size,
@@ -352,11 +354,8 @@ unsigned long bitmap_find_next_zero_area_and_size(unsigned long *map,
 }
 EXPORT_SYMBOL(bitmap_find_next_zero_area_and_size);
 
-/*
- * bitmap_find_next_zero_area - find a contiguous aligned zero area
-=======
+/**
  * bitmap_find_next_zero_area_off - find a contiguous aligned zero area
->>>>>>> /data/w2017/ref/linux-3.18.140/lib/bitmap.c
  * @map: The address to base the search on
  * @size: The bitmap size in bits
  * @start: The bitnumber to start searching at

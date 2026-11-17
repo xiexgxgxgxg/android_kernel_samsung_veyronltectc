@@ -236,11 +236,9 @@ static inline int inet_is_local_reserved_port(struct net *net, int port)
 }
 #endif
 
-<<<<<<< /data/w2017/kernel/include/net/ip.h
 extern int sysctl_reserved_port_bind;
-=======
+
 __be32 inet_current_timestamp(void);
->>>>>>> /data/w2017/ref/linux-3.18.140/include/net/ip.h
 
 /* From inetpeer.c */
 extern int inet_peer_threshold;

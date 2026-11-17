@@ -128,12 +128,9 @@ int inet6_create(struct net *net, struct socket *sock, int protocol, int kern)
 	if (protocol < 0 || protocol >= IPPROTO_MAX)
 		return -EINVAL;
 
-<<<<<<< /data/w2017/kernel/net/ipv6/af_inet6.c
 	if (!current_has_network())
 		return -EACCES;
 
-=======
->>>>>>> /data/w2017/ref/linux-3.18.140/net/ipv6/af_inet6.c
 	/* Look for the requested type/protocol pair. */
 lookup_protocol:
 	err = -ESOCKTNOSUPPORT;
