@@ -47,6 +47,9 @@ allowed_warnings = set([
     "pppopns.c:296",
     "pppopns.c:305",
     "pppopns.c:336",
+    # IPA with the newer msm_ipa.h: GCC 4.9 flags a loop that the
+    # hardware IPA code intentionally runs to the message count.
+    "ipa_debugfs.c:1275",
  ])
 
 # Capture the name of the object file, can find it.
