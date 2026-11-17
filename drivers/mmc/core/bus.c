@@ -255,6 +255,33 @@ static struct bus_type mmc_bus_type = {
 	.pm		= &mmc_bus_pm_ops,
 };
 
+static int __mmc_pick_sd_card(struct device *dev, void *data)
+{
+	struct mmc_card *card = container_of(dev, struct mmc_card, dev);
+	struct mmc_card **out = data;
+
+	if (card->type == MMC_TYPE_SD) {
+		*out = card;
+		return 1;
+	}
+	return 0;
+}
+
+/*
+ * Bring-up helper: the first SD card on the MMC bus, or NULL.
+ *
+ * veyron_sdlog talks to the card with CMD24 directly instead of going through
+ * mmc_blk, so it can log before (or without) the block driver.
+ */
+struct mmc_card *mmc_first_sd_card(void)
+{
+	struct mmc_card *card = NULL;
+
+	bus_for_each_dev(&mmc_bus_type, NULL, &card, __mmc_pick_sd_card);
+	return card;
+}
+EXPORT_SYMBOL_GPL(mmc_first_sd_card);
+
 int mmc_register_bus(void)
 {
 	return bus_register(&mmc_bus_type);
