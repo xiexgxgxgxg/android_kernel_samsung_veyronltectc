@@ -2395,11 +2395,8 @@ sd_read_write_protect_flag(struct scsi_disk *sdkp, unsigned char *buffer)
 	int res;
 	struct scsi_device *sdp = sdkp->device;
 	struct scsi_mode_data data;
-<<<<<<< /data/w2017/kernel/drivers/scsi/sd.c
-=======
 	int disk_ro = get_disk_ro(sdkp->disk);
 	int old_wp = sdkp->write_prot;
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/scsi/sd.c
 
 	set_disk_ro(sdkp->disk, 0);
 	if (sdp->skip_ms_page_3f) {
@@ -2439,9 +2436,6 @@ sd_read_write_protect_flag(struct scsi_disk *sdkp, unsigned char *buffer)
 			  "Test WP failed, assume Write Enabled\n");
 	} else {
 		sdkp->write_prot = ((data.device_specific & 0x80) != 0);
-<<<<<<< /data/w2017/kernel/drivers/scsi/sd.c
-		set_disk_ro(sdkp->disk, sdkp->write_prot);
-=======
 		set_disk_ro(sdkp->disk, sdkp->write_prot || disk_ro);
 		if (sdkp->first_scan || old_wp != sdkp->write_prot) {
 			sd_printk(KERN_NOTICE, sdkp, "Write Protect is %s\n",
@@ -2450,7 +2444,6 @@ sd_read_write_protect_flag(struct scsi_disk *sdkp, unsigned char *buffer)
 				  "Mode Sense: %02x %02x %02x %02x\n",
 				  buffer[0], buffer[1], buffer[2], buffer[3]);
 		}
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/scsi/sd.c
 	}
 }
 
@@ -3527,13 +3520,8 @@ static int sd_resume(struct device *dev)
 	struct scsi_disk *sdkp = scsi_disk_get_from_dev(dev);
 	int ret = 0;
 
-<<<<<<< /data/w2017/kernel/drivers/scsi/sd.c
-	if (!sdkp)
-		return 0;	/* this can happen */
-=======
 	if (!sdkp)	/* E.g.: runtime resume at the start of sd_probe() */
 		return 0;
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/scsi/sd.c
 
 	if (!sdkp->device->manage_start_stop)
 		goto done;

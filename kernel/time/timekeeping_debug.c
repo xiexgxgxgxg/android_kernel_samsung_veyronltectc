@@ -71,18 +71,12 @@ late_initcall(tk_debug_sleep_time_init);
 
 void tk_debug_account_sleep_time(struct timespec64 *t)
 {
-<<<<<<< /data/w2017/kernel/kernel/time/timekeeping_debug.c
 #ifdef CONFIG_SEC_PM_DEBUG
 	printk("Suspended for %lu.%03lu seconds\n",
 			t->tv_sec, t->tv_nsec / NSEC_PER_MSEC);
 #endif
 
-	sleep_time_bin[fls(t->tv_sec)]++;
-=======
 	/* Cap bin index so we don't overflow the array */
-	int bin = min(fls(t->tv_sec), NUM_BINS-1);
-
-	sleep_time_bin[bin]++;
->>>>>>> /data/w2017/ref/linux-3.18.140/kernel/time/timekeeping_debug.c
+	sleep_time_bin[min(fls(t->tv_sec), NUM_BINS - 1)]++;
 }
 

@@ -375,7 +375,6 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid)
 			goto done;
 		}
 
-<<<<<<< /data/w2017/kernel/fs/proc/task_mmu.c
 		tid = pid_of_stack(priv, vma, is_pid);
 		if (tid != 0) {
 			/*
@@ -397,10 +396,6 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid)
 			seq_pad(m, ' ');
 			seq_print_vma_name(m, vma);
 		}
-=======
-		if (is_stack(priv, vma))
-			name = "[stack]";
->>>>>>> /data/w2017/ref/linux-3.18.140/fs/proc/task_mmu.c
 	}
 
 done:
@@ -547,7 +542,6 @@ static void smaps_pte_entry(pte_t *pte, unsigned long addr,
 	} else if (is_swap_pte(*pte)) {
 		swp_entry_t swpent = pte_to_swp_entry(*pte);
 
-<<<<<<< /data/w2017/kernel/fs/proc/task_mmu.c
 		if (!non_swap_entry(swpent)) {
 			int mapcount;
 
@@ -562,11 +556,6 @@ static void smaps_pte_entry(pte_t *pte, unsigned long addr,
 				mss->swap_pss += (u64)ptent_size << PSS_SHIFT;
 			}
 		} else if (is_migration_entry(swpent))
-=======
-		if (!non_swap_entry(swpent))
-			mss->swap += PAGE_SIZE;
-		else if (is_migration_entry(swpent))
->>>>>>> /data/w2017/ref/linux-3.18.140/fs/proc/task_mmu.c
 			page = migration_entry_to_page(swpent);
 	} else if (pte_file(*pte)) {
 		if (pte_to_pgoff(*pte) != pgoff)

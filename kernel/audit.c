@@ -89,11 +89,7 @@ u32		audit_ever_enabled = !!AUDIT_OFF;
 EXPORT_SYMBOL_GPL(audit_enabled);
 
 /* Default state when kernel boots without any parameters. */
-<<<<<<< /data/w2017/kernel/kernel/audit.c
 static u32	audit_default = 1;
-=======
-static u32	audit_default = AUDIT_OFF;
->>>>>>> /data/w2017/ref/linux-3.18.140/kernel/audit.c
 
 /* If auditing cannot proceed, audit_failure selects what happens. */
 static u32	audit_failure = AUDIT_FAIL_PRINTK;
