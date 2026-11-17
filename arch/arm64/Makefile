@@ -10,16 +10,13 @@
 #
 # Copyright (C) 1995-2001 by Russell King
 
-<<<<<<< /data/w2017/kernel/arch/arm64/Makefile
-ifeq ($(CONFIG_RELOCATABLE_KERNEL), y) 
+# Samsung's relocatable kernel support (CONFIG_RELOCATABLE_KERNEL) kept;
+# upstream 3.18.140 only ever needs the -X form.
+ifeq ($(CONFIG_RELOCATABLE_KERNEL), y)
 LDFLAGS_vmlinux	:=-p --no-undefined -X -pie
-else 
+else
 LDFLAGS_vmlinux	:=-p --no-undefined -X
-endif 
-
-=======
-LDFLAGS_vmlinux	:=--no-undefined -X
->>>>>>> /data/w2017/ref/linux-3.18.140/arch/arm64/Makefile
+endif
 CPPFLAGS_vmlinux.lds = -DTEXT_OFFSET=$(TEXT_OFFSET)
 OBJCOPYFLAGS	:=-O binary -R .note -R .note.gnu.build-id -R .comment -S
 GZFLAGS		:=-9
@@ -29,12 +26,7 @@ LIBGCC 		:= $(shell $(CC) $(KBUILD_CFLAGS) -print-libgcc-file-name)
 KBUILD_DEFCONFIG := defconfig
 
 KBUILD_CFLAGS	+= -mgeneral-regs-only
-<<<<<<< /data/w2017/kernel/arch/arm64/Makefile
-KBUILD_CFLAGS	+= -fno-pic
-=======
-KBUILD_CFLAGS	+= $(call cc-option, -mpc-relative-literal-loads)
-
->>>>>>> /data/w2017/ref/linux-3.18.140/arch/arm64/Makefile
+KBUILD_CFLAGS	+= -fno-pic $(call cc-option, -mpc-relative-literal-loads)
 ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
 KBUILD_CPPFLAGS	+= -mbig-endian
 AS		+= -EB

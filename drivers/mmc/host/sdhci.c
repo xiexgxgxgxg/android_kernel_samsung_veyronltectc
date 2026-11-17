@@ -1417,13 +1417,9 @@ clock_set:
 			return;
 		}
 		timeout--;
-<<<<<<< /data/w2017/kernel/drivers/mmc/host/sdhci.c
-		udelay(1);
-=======
 		spin_unlock_irq(&host->lock);
 		usleep_range(900, 1100);
 		spin_lock_irq(&host->lock);
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/mmc/host/sdhci.c
 	}
 
 	clk |= SDHCI_CLOCK_CARD_EN;
@@ -1437,7 +1433,6 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
 	struct mmc_host *mmc = host->mmc;
 	u8 pwr = 0;
 
-<<<<<<< /data/w2017/kernel/drivers/mmc/host/sdhci.c
 	/*
 	 * Don't disable/re-enable power to the card when running a
 	 * suspend/resume sequence and the pm_flags are configured to preserve
@@ -1461,8 +1456,6 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
 		return;
 	}
 
-=======
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/mmc/host/sdhci.c
 	if (mode != MMC_POWER_OFF) {
 		switch (1 << vdd) {
 		case MMC_VDD_165_195:

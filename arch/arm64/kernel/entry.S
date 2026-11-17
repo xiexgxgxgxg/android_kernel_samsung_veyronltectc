@@ -614,11 +614,7 @@ el0_inv:
 	mov	x0, sp
 	mov	x1, #BAD_SYNC
 	mrs	x2, esr_el1
-<<<<<<< /data/w2017/kernel/arch/arm64/kernel/entry.S
-	bl	bad_mode
-=======
 	bl	bad_el0_sync
->>>>>>> /data/w2017/ref/linux-3.18.140/arch/arm64/kernel/entry.S
 	b	ret_to_user
 ENDPROC(el0_sync)
 
