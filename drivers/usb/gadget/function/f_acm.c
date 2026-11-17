@@ -652,11 +652,7 @@ static int acm_notify_serial_state(struct f_acm *acm)
 {
 	struct usb_composite_dev *cdev = acm->port.func.config->cdev;
 	int			status;
-<<<<<<< /data/w2017/kernel/drivers/usb/gadget/function/f_acm.c
 	unsigned long	flags;
-=======
-	__le16			serial_state;
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/usb/gadget/function/f_acm.c
 
 	spin_lock_irqsave(&acm->lock, flags);
 	if (acm->notify_req) {

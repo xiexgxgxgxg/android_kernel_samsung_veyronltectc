@@ -100,15 +100,10 @@ static int ehci_msm_probe(struct platform_device *pdev)
 		return  -ENOMEM;
 	}
 
-<<<<<<< /data/w2017/kernel/drivers/usb/host/ehci-msm.c
 	hcd_to_bus(hcd)->skip_resume = true;
 
 	hcd->irq = platform_get_irq(pdev, 0);
 	if (hcd->irq < 0) {
-=======
-	ret = platform_get_irq(pdev, 0);
-	if (ret < 0) {
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/usb/host/ehci-msm.c
 		dev_err(&pdev->dev, "Unable to get IRQ resource\n");
 		goto put_hcd;
 	}

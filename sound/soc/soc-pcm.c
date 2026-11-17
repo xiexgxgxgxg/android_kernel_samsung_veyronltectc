@@ -183,20 +183,11 @@ int dpcm_dapm_stream_event(struct snd_soc_pcm_runtime *fe, int dir,
 
 		dev_dbg(be->dev, "ASoC: BE %s event %d dir %d\n",
 				be->dai_link->name, event, dir);
-<<<<<<< /data/w2017/kernel/sound/soc/soc-pcm.c
 		if (event == SND_SOC_DAPM_STREAM_STOP && be->dpcm[dir].users >= 1) {
 			pr_debug("%s Don't close BE \n", __func__);
 			continue;
 		}
 			snd_soc_dapm_stream_event(be, dir, event);
-=======
-
-		if ((event == SND_SOC_DAPM_STREAM_STOP) &&
-		    (be->dpcm[dir].users >= 1))
-			continue;
-
-		snd_soc_dapm_stream_event(be, dir, event);
->>>>>>> /data/w2017/ref/linux-3.18.140/sound/soc/soc-pcm.c
 	}
 
 	snd_soc_dapm_stream_event(fe, dir, event);

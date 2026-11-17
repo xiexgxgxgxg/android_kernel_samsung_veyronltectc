@@ -787,15 +787,12 @@ static int dwc3_ep0_std_request(struct dwc3 *dwc, struct usb_ctrlrequest *ctrl)
 		dwc3_trace(trace_dwc3_ep0, "USB_REQ_SET_ISOCH_DELAY\n");
 		ret = dwc3_ep0_set_isoch_delay(dwc, ctrl);
 		break;
-<<<<<<< /data/w2017/kernel/drivers/usb/dwc3/ep0.c
 #ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 	case USB_REQ_SET_INTERFACE:
 		dev_vdbg(dwc->dev, "USB_REQ_SET_INTERFACE\n");
 		ret = dwc3_ep0_set_interface(dwc, ctrl);
 		break;
 #endif
-=======
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/usb/dwc3/ep0.c
 	default:
 		dwc3_trace(trace_dwc3_ep0, "Forwarding to gadget driver\n");
 		ret = dwc3_ep0_delegate_req(dwc, ctrl);

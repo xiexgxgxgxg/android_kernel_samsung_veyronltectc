@@ -755,17 +755,12 @@ static int sleep_thread(struct fsg_common *common, bool can_freeze)
 	__set_current_state(TASK_RUNNING);
 	spin_lock_irq(&common->lock);
 	common->thread_wakeup_needed = 0;
-<<<<<<< /data/w2017/kernel/drivers/usb/gadget/function/f_mass_storage.c
-	spin_unlock_irq(&common->lock);
-	smp_rmb();	/* ensure the latest bh->state is visible */
-=======
 
 	/*
 	 * Ensure the writing of thread_wakeup_needed
 	 * and the reading of bh->state are completed
 	 */
 	smp_mb();
->>>>>>> /data/w2017/ref/linux-3.18.140/drivers/usb/gadget/function/f_mass_storage.c
 	return rc;
 }
 
