@@ -1,0 +1,64 @@
+
+# --- added 2026-11-17: stop tracking kernel build output -----------------------
+# The W2017KEU1APJ7 source drop shipped with its build tree committed (vmlinux,
+# vmlinux.o, built-in.o, thousands of .o and the empty include/config/*.h
+# stubs).  That made every build dirty "git status" and, worse, made a push
+# fail on GitHub's 100 MB per-file limit.  Output is now ignored; `make`
+# regenerates all of it.
+*.o
+*.o.d
+*.o.tmp
+*.cmd
+*.ko
+*.a
+*.mod.c
+*.tmp
+*.symvers
+*.order
+*#
+*~
+core
+.core
+vmlinux
+vmlinux.o
+.tmp_vmlinux*
+.tmp_kallsyms*
+.tmp_System.map
+System.map
+Module.symvers
+Image
+Image.gz
+zImage
+uImage
+*.dtb
+*.dtb.img
+*.dts.tmp
+*.d.pre.tmp
+*.d.dtc.tmp
+.lex.c
+.tab.c
+.tab.h
+.version
+.config.old
+.config.cmd
+.localversion
+.missing-syscalls.d
+.tmp_versions/
+include/config/
+include/generated/
+arch/*/include/generated/
+scripts/basic/fixdep
+scripts/kconfig/conf
+scripts/kconfig/zconf.tab.c
+scripts/kconfig/lexer.lex.c
+scripts/mod/modpost
+scripts/mod/mk_elfconfig
+scripts/mod/elfconfig.h
+usr/initramfs_data.cpio*
+scripts/kconfig/zconf.lex.c
+scripts/kconfig/zconf.tab.c
+scripts/kconfig/zconf.tab.h
+scripts/dtc/dtc-lexer.lex.c
+scripts/dtc/dtc-parser.tab.c
+scripts/dtc/dtc-parser.tab.h
+out/
