@@ -65,7 +65,7 @@ Enabled for Android 11 (2026-11-18):
 
 | Config | Note |
 |---|---|
-| `CONFIG_USB_CONFIGFS` (+ `F_FS`, `F_MTP`, `F_PTP`, `F_ACC`, `F_AUDIO_SRC`, `UEVENT`, `NCM`, `ECM`) | replaced the legacy `USB_G_ANDROID` gadget; Android 11 init only speaks configfs |
+| `CONFIG_USB_G_ANDROID` (legacy gadget) | kept: the official Lineage xiaomi8996 18.1 config and this device's `init.qcom.usb.rc` are legacy-only; configfs was tried and reverted |
 | `CONFIG_ANDROID_BINDER_DEVICES` | `"binder,hwbinder,vndbinder"` with the CAF multi-context binder backport |
 | `CONFIG_QUOTA`, `CONFIG_QUOTACTL`, `CONFIG_QFMT_V2` | ext4 project quota / storage stats |
 | `CONFIG_MEMCG`, `CONFIG_MEMCG_KMEM` | LMKD memory pressure |
