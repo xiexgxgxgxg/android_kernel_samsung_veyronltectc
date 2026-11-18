@@ -1537,6 +1537,30 @@ static int mdss_mdp_get_cmdline_config(struct platform_device *pdev)
 	return rc;
 }
 
+/*
+ * W2017: the Android 11 SDM (hardware/qcom/display sdm/fb/hw_info.cpp) gets
+ * the hardware pipe list from this file.  It needs a "pipe_count" key
+ * followed by one line per pipe with pipe_type/pipe_ndx/rects; the old
+ * 6.0.1-only keys (rgb_pipes=, vig_pipes=, ...) are not parsed anymore and
+ * left SDM with zero pipes ("ResourceDefault::Init: Number of H/W pipes is
+ * Zero!"), which made the composer crash later in DisplayBase::Init().
+ * Same format as the Samsung S7 lineage-18.1 kernel.
+ */
+static void mdss_mdp_caps_sspp(struct mdss_mdp_pipe *pipes, u32 count,
+		const char *type, char *buf, int *cnt)
+{
+	size_t len = PAGE_SIZE;
+	u32 i;
+
+#define SPRINT(fmt, ...) \
+		(*cnt += scnprintf(buf + *cnt, len - *cnt, fmt, ##__VA_ARGS__))
+
+	for (i = 0; i < count && pipes; i++)
+		SPRINT("pipe_type:%s pipe_ndx:%d rects:1 pipe_num:%d\n",
+			type, pipes[i].ndx, pipes[i].num);
+#undef SPRINT
+}
+
 static ssize_t mdss_mdp_show_capabilities(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -1553,6 +1577,16 @@ static ssize_t mdss_mdp_show_capabilities(struct device *dev,
 
 	SPRINT("mdp_version=5\n");
 	SPRINT("hw_rev=%d\n", mdata->mdp_rev);
+	SPRINT("pipe_count:%d\n", mdata->nvig_pipes + mdata->nrgb_pipes +
+		mdata->ndma_pipes + mdata->ncursor_pipes);
+	mdss_mdp_caps_sspp(mdata->vig_pipes, mdata->nvig_pipes, "vig",
+		buf, &cnt);
+	mdss_mdp_caps_sspp(mdata->rgb_pipes, mdata->nrgb_pipes, "rgb",
+		buf, &cnt);
+	mdss_mdp_caps_sspp(mdata->dma_pipes, mdata->ndma_pipes, "dma",
+		buf, &cnt);
+	mdss_mdp_caps_sspp(mdata->cursor_pipes, mdata->ncursor_pipes, "cursor",
+		buf, &cnt);
 	SPRINT("rgb_pipes=%d\n", mdata->nrgb_pipes);
 	SPRINT("vig_pipes=%d\n", mdata->nvig_pipes);
 	SPRINT("dma_pipes=%d\n", mdata->ndma_pipes);
