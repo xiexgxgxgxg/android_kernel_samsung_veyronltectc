@@ -61,17 +61,29 @@ Already present: `CONFIG_ANDROID_BINDER_IPC`, `CONFIG_ASHMEM`, `CONFIG_ION`,
 `CONFIG_FUSE_FS`, `CONFIG_CGROUP_FREEZER/CPUACCT/SCHED`, `CONFIG_NAMESPACES`,
 `CONFIG_NETFILTER_XT_MATCH_QTAGUID`, `CONFIG_EXT4_FS_SECURITY`.
 
-Missing / needs work:
+Enabled for Android 11 (2026-11-18):
+
+| Config | Note |
+|---|---|
+| `CONFIG_USB_CONFIGFS` (+ `F_FS`, `F_MTP`, `F_PTP`, `F_ACC`, `F_AUDIO_SRC`, `UEVENT`, `NCM`, `ECM`) | replaced the legacy `USB_G_ANDROID` gadget; Android 11 init only speaks configfs |
+| `CONFIG_ANDROID_BINDER_DEVICES` | `"binder,hwbinder,vndbinder"` with the CAF multi-context binder backport |
+| `CONFIG_QUOTA`, `CONFIG_QUOTACTL`, `CONFIG_QFMT_V2` | ext4 project quota / storage stats |
+| `CONFIG_MEMCG`, `CONFIG_MEMCG_KMEM` | LMKD memory pressure |
+| `CONFIG_BLK_CGROUP` | blkio cgroup |
+| `CONFIG_F2FS_FS` (+ xattr/ACL/security) | the fstab lists f2fs for userdata/cache |
+| `CONFIG_OVERLAY_FS` | overlay mounts |
+
+Still open:
 
 | Config | Impact |
 |---|---|
-| `CONFIG_USB_CONFIGFS` (+ `USB_CONFIGFS_F_FS`, `_F_MTP`) | not enabled, but `drivers/usb/gadget/configfs.c` **exists** in this tree — Android 11 adb/MTP needs it (stock uses `USB_G_ANDROID` legacy gadget) |
-| `CONFIG_QUOTA`, `CONFIG_QUOTACTL`, `CONFIG_QFMT_V2` | ext4 project quota / storage stats |
-| `CONFIG_MEMCG` | LMKD memory pressure (alternative: keep vmpressure and patch lmkd) |
-| `CONFIG_CGROUP_BLKIO` | blkio cgroup (minor) |
 | `CONFIG_SDCARDFS` | absent; Android 11 can use FUSE (`FUSE_FS=y`) instead |
-| `CONFIG_PSI` | not available on 3.18; needs memcg/vmpressure fallback |
-| `CONFIG_ENCRYPTED_KEYS` | FBE only; W2017 uses FDE, so not blocking |
+| `CONFIG_PSI` | not available on 3.18; needs the memcg/vmpressure fallback |
+| `CONFIG_ENCRYPTED_KEYS` | FBE only; the W2017 stock layout is FDE, so not blocking |
+
+The verified TWRP configuration (legacy `USB_G_ANDROID`) is kept as
+`arch/arm64/configs/veyronlte_ctc_twrp_defconfig`; TWRP must be rebuilt with
+it until TWRP's init is configfs-aware.
 
 ## Patch source
 
