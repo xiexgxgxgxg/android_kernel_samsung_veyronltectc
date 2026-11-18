@@ -34,6 +34,8 @@
 #endif
 #ifdef CONFIG_SEC_DEBUG_SUMMARY
 #include <linux/qcom/sec_debug_summary.h>
+
+extern void sdlog_bark_kick(void);
 #endif
 
 #define MODULE_NAME "msm_watchdog"
@@ -482,6 +484,8 @@ static irqreturn_t wdog_bark_handler(int irq, void *dev_id)
 
 	if (wdog_dd->do_ipi_ping)
 		dump_cpu_alive_mask(wdog_dd);
+	sdlog_bark_kick();
+	mdelay(500);
 	msm_trigger_wdog_bite();
 	panic("Failed to cause a watchdog bite! - Falling back to kernel panic!");
 	return IRQ_HANDLED;

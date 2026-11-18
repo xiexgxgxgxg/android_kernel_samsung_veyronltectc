@@ -506,6 +506,20 @@ static int __init sdlog_init(void)
 	return 0;
 }
 
+/*
+ * Called from the watchdog bark handler: the box is about to be reset, so get
+ * the current log on the card from a workqueue while the hardware bite time
+ * still gives us a window.
+ */
+void sdlog_bark_kick(void)
+{
+	if (!sdlog_enable)
+		return;
+	strncpy(sdlog_tag, "bark", SDLOG_TAG_LEN);
+	schedule_delayed_work(&sdlog_dwork, 0);
+}
+EXPORT_SYMBOL_GPL(sdlog_bark_kick);
+
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Veyron kernel log ring on microSD via the MMC core");
 core_initcall(sdlog_init);
