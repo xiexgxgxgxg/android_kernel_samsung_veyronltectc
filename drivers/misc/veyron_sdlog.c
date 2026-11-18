@@ -64,7 +64,7 @@
 #define SDLOG_RESERVE_SECTORS	16384UL		/* 8 MiB at the end of the card */
 #define SDLOG_RING_SECTORS	(SDLOG_RESERVE_SECTORS - 2)
 #define SDLOG_BLOCK_SIZE	512
-#define SDLOG_MAX_BYTES		(16 * 1024)	/* 32 data blocks + header */
+#define SDLOG_MAX_BYTES		(64 * 1024)	/* 128 data blocks + header */
 #define SDLOG_ALIGN		64
 
 struct sdlog_rec_hdr {
@@ -468,6 +468,17 @@ static void sdlog_capture(struct kmsg_dumper *dumper,
 	 * when panic_on_oops=0 (the box keeps running) and for panic() after
 	 * the panic notifiers have run.
 	 */
+	if (reason == KMSG_DUMP_PANIC) {
+		/*
+		 * The box is going down right now; a workqueue flush is too
+		 * late (the scheduler may never run again).  Do it here, on
+		 * the panic CPU, while the buffer still has the oops text.
+		 */
+		sdlog_self_dump = false;
+		if (sdlog_state_loaded || sdlog_card())
+			sdlog_flush();
+	}
+
 	if (reason == KMSG_DUMP_PANIC || reason == KMSG_DUMP_OOPS)
 		schedule_delayed_work(&sdlog_dwork, 0);
 }
