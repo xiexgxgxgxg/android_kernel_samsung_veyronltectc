@@ -144,10 +144,20 @@ static int misc_open(struct inode * inode, struct file * file)
 
 	err = 0;
 	replace_fops(file, new_fops);
-	if (file->f_op->open) {
-		file->private_data = c;
+	file->private_data = c;
+	/*
+	 * Do not call the driver's open() with misc_mtx held: one driver
+	 * whose open never returns used to take every other misc device
+	 * (binder, ashmem, ion, ...) down with it.  fops_get() above keeps
+	 * the module alive; print the name so a stuck open is identifiable.
+	 */
+	if (c->name)
+		pr_info("misc_open: %s pid %d\n", c->name, task_pid_nr(current));
+	mutex_unlock(&misc_mtx);
+	if (file->f_op->open)
 		err = file->f_op->open(inode,file);
-	}
+	return err;
+
 fail:
 	mutex_unlock(&misc_mtx);
 	return err;
