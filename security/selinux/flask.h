@@ -32,26 +32,33 @@
 #define SECCLASS_SHM                                     28
 #define SECCLASS_IPC                                     29
 #define SECCLASS_NETLINK_ROUTE_SOCKET                    30
-#define SECCLASS_NETLINK_FIREWALL_SOCKET                 31
-#define SECCLASS_NETLINK_TCPDIAG_SOCKET                  32
-#define SECCLASS_NETLINK_NFLOG_SOCKET                    33
-#define SECCLASS_NETLINK_XFRM_SOCKET                     34
-#define SECCLASS_NETLINK_SELINUX_SOCKET                  35
+#define SECCLASS_NETLINK_TCPDIAG_SOCKET                  31
+#define SECCLASS_NETLINK_NFLOG_SOCKET                    32
+#define SECCLASS_NETLINK_XFRM_SOCKET                     33
+#define SECCLASS_NETLINK_SELINUX_SOCKET                  34
+#define SECCLASS_NETLINK_ISCSI_SOCKET                    35
 #define SECCLASS_NETLINK_AUDIT_SOCKET                    36
-#define SECCLASS_NETLINK_IP6FW_SOCKET                    37
-#define SECCLASS_NETLINK_DNRT_SOCKET                     38
-#define SECCLASS_ASSOCIATION                             39
-#define SECCLASS_NETLINK_KOBJECT_UEVENT_SOCKET           40
-#define SECCLASS_APPLETALK_SOCKET                        41
-#define SECCLASS_PACKET                                  42
-#define SECCLASS_KEY                                     43
-#define SECCLASS_DCCP_SOCKET                             44
-#define SECCLASS_MEMPROTECT                              45
-#define SECCLASS_PEER                                    46
-#define SECCLASS_CAPABILITY2                             47
-#define SECCLASS_KERNEL_SERVICE                          48
-#define SECCLASS_TUN_SOCKET                              49
-#define SECCLASS_BINDER                                  50
+#define SECCLASS_NETLINK_FIB_LOOKUP_SOCKET               37
+#define SECCLASS_NETLINK_CONNECTOR_SOCKET                38
+#define SECCLASS_NETLINK_NETFILTER_SOCKET                39
+#define SECCLASS_NETLINK_DNRT_SOCKET                     40
+#define SECCLASS_ASSOCIATION                             41
+#define SECCLASS_NETLINK_KOBJECT_UEVENT_SOCKET           42
+#define SECCLASS_NETLINK_GENERIC_SOCKET                  43
+#define SECCLASS_NETLINK_SCSITRANSPORT_SOCKET            44
+#define SECCLASS_NETLINK_RDMA_SOCKET                     45
+#define SECCLASS_NETLINK_CRYPTO_SOCKET                   46
+#define SECCLASS_APPLETALK_SOCKET                        47
+#define SECCLASS_PACKET                                  48
+#define SECCLASS_KEY                                     49
+#define SECCLASS_DCCP_SOCKET                             50
+#define SECCLASS_MEMPROTECT                              51
+#define SECCLASS_PEER                                    52
+#define SECCLASS_CAPABILITY2                             53
+#define SECCLASS_KERNEL_SERVICE                          54
+#define SECCLASS_TUN_SOCKET                              55
+#define SECCLASS_BINDER                                  56
+#define SECCLASS_CAN_SOCKET                              57
 
 #define SECINITSID_KERNEL                                   1
 #define SECINITSID_SECURITY                                 2
@@ -98,18 +105,25 @@ static inline bool security_is_socket_class(u16 kern_tclass)
 	case SECCLASS_UNIX_STREAM_SOCKET:
 	case SECCLASS_UNIX_DGRAM_SOCKET:
 	case SECCLASS_NETLINK_ROUTE_SOCKET:
-	case SECCLASS_NETLINK_FIREWALL_SOCKET:
 	case SECCLASS_NETLINK_TCPDIAG_SOCKET:
 	case SECCLASS_NETLINK_NFLOG_SOCKET:
 	case SECCLASS_NETLINK_XFRM_SOCKET:
 	case SECCLASS_NETLINK_SELINUX_SOCKET:
+	case SECCLASS_NETLINK_ISCSI_SOCKET:
 	case SECCLASS_NETLINK_AUDIT_SOCKET:
-	case SECCLASS_NETLINK_IP6FW_SOCKET:
+	case SECCLASS_NETLINK_FIB_LOOKUP_SOCKET:
+	case SECCLASS_NETLINK_CONNECTOR_SOCKET:
+	case SECCLASS_NETLINK_NETFILTER_SOCKET:
 	case SECCLASS_NETLINK_DNRT_SOCKET:
 	case SECCLASS_NETLINK_KOBJECT_UEVENT_SOCKET:
+	case SECCLASS_NETLINK_GENERIC_SOCKET:
+	case SECCLASS_NETLINK_SCSITRANSPORT_SOCKET:
+	case SECCLASS_NETLINK_RDMA_SOCKET:
+	case SECCLASS_NETLINK_CRYPTO_SOCKET:
 	case SECCLASS_APPLETALK_SOCKET:
 	case SECCLASS_DCCP_SOCKET:
 	case SECCLASS_TUN_SOCKET:
+	case SECCLASS_CAN_SOCKET:
 		sock = true;
 		break;
 	default:
