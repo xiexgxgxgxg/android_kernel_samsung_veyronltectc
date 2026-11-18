@@ -49,6 +49,24 @@
 #include <linux/tty.h>
 #include <linux/kmod.h>
 #include <linux/gfp.h>
+#include <linux/sched.h>
+#include <linux/string.h>
+
+/*
+ * Bring-up diagnostic (drivers/misc/veyron_diag.c): remember which misc
+ * device is being opened right now.  misc_open() holds misc_mtx across the
+ * driver's ->open(), so a driver whose open never returns parks every other
+ * misc device in the system; this snapshot names the culprit.
+ */
+static pid_t misc_open_pid;
+static char misc_open_name[32];
+
+void misc_open_snapshot(pid_t *pid, char *name, size_t namesz)
+{
+	*pid = misc_open_pid;
+	if (name && namesz)
+		strlcpy(name, misc_open_name, namesz);
+}
 
 /*
  * Head entry for the doubly linked miscdevice list
@@ -146,7 +164,12 @@ static int misc_open(struct inode * inode, struct file * file)
 	replace_fops(file, new_fops);
 	if (file->f_op->open) {
 		file->private_data = c;
+		misc_open_pid = current->pid;
+		strlcpy(misc_open_name, c->name ? c->name : "?",
+			sizeof(misc_open_name));
 		err = file->f_op->open(inode,file);
+		misc_open_pid = 0;
+		misc_open_name[0] = '\0';
 	}
 fail:
 	mutex_unlock(&misc_mtx);

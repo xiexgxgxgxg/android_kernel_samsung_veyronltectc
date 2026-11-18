@@ -610,3 +610,12 @@ config VEYRON_SDLOG
 	  Keep rewriting the tail of the kernel log into a raw region at the end
 	  of the microSD card every few hundred milliseconds.  Works
 	  independently of UFS and survives a power cycle.
+
+config VEYRON_DIAG
+	bool "Dump stuck tasks (D state, init, misc_open holder) a few times per boot"
+	default n
+	help
+	  Print the stack of every task in TASK_UNINTERRUPTIBLE, the task inside
+	  misc_open()'s ->open() (the holder of misc_mtx) and init, a few times
+	  after boot.  Meant for bring-up boots where adb never comes up: the
+	  output goes to printk and therefore into the VEYRON_SDLOG ring.
