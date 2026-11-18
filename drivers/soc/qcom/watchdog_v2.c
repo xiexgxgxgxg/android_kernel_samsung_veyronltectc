@@ -20,6 +20,7 @@
 #include <linux/mutex.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
+#include <linux/nmi.h>
 #include <linux/irq.h>
 #include <linux/percpu.h>
 #include <linux/of.h>
@@ -485,7 +486,9 @@ static irqreturn_t wdog_bark_handler(int irq, void *dev_id)
 	if (wdog_dd->do_ipi_ping)
 		dump_cpu_alive_mask(wdog_dd);
 	sdlog_bark_kick();
-	mdelay(500);
+	mdelay(300);
+	trigger_all_cpu_backtrace();
+	mdelay(300);
 	msm_trigger_wdog_bite();
 	panic("Failed to cause a watchdog bite! - Falling back to kernel panic!");
 	return IRQ_HANDLED;
