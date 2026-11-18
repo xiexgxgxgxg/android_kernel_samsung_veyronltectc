@@ -60,7 +60,9 @@ static inline struct power_supply *get_power_supply_by_name(char *name)
 	}	\
 }
 
+#if IS_ENABLED(CONFIG_USB_G_ANDROID)
 extern void set_ncm_ready(bool ready);
+#endif
 
 struct usb_notifier_platform_data {
 #if defined(CONFIG_CCIC_NOTIFIER)
@@ -339,8 +341,10 @@ static int qcom_set_peripheral(bool enable)
 	else
 		pr_err("usb: dwc-usb power supply is null!\n");
 
+#if IS_ENABLED(CONFIG_USB_G_ANDROID)
     if(!enable)
         set_ncm_ready(false);
+#endif
 
 	return 0;
 }
