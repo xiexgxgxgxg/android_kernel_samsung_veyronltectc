@@ -76,3 +76,4 @@ obj-$(CONFIG_SEC_BSP) += sec_misc.o sec_param.o
 # for DMVerity
 obj-$(CONFIG_DM_VERITY)		+= dmverity_query.o
 obj-$(CONFIG_VEYRON_SDLOG) += veyron_sdlog.o
+obj-$(CONFIG_VEYRON_DIAG) += veyron_diag.o

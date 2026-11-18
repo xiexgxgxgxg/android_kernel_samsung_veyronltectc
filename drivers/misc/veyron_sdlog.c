@@ -114,6 +114,13 @@ static bool sdlog_cmd_logged;
 static struct kmsg_dumper sdlog_dumper;
 static struct delayed_work sdlog_dwork;
 
+/*
+ * Serialises the ring cursor between the periodic writer and sdlog_emit()
+ * (used by veyron_diag.c), and guards sdlog_hdr_blk.
+ */
+static DEFINE_MUTEX(sdlog_emit_mutex);
+static u8 sdlog_emit_buf[SDLOG_MAX_BYTES] __attribute__((aligned(SDLOG_ALIGN)));
+
 static struct mmc_card *sdlog_card(void)
 {
 	return mmc_first_sd_card();
@@ -375,6 +382,7 @@ static void sdlog_flush(void)
 		sdlog_len = (blocks - 1) * SDLOG_BLOCK_SIZE;
 	}
 
+	mutex_lock(&sdlog_emit_mutex);
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.magic = SDLOG_MAGIC_V2;
 	hdr.seq = sdlog_seq + 1;
@@ -420,6 +428,7 @@ static void sdlog_flush(void)
 	}
 
 	mmc_release_host(host);
+	mutex_unlock(&sdlog_emit_mutex);
 
 	if (!err)
 		sdlog_writes++;
@@ -442,6 +451,87 @@ static void sdlog_flush(void)
 		pr_info("sdlog: raw mmc write failed: %d\n", err);
 	}
 }
+
+/*
+ * Write an out-of-band record to the ring, straight to the card.
+ *
+ * veyron_diag.c uses this to report stuck tasks: it does not go through
+ * printk, logbuf_lock, kmsg_dump or the workqueues, so it still works when
+ * printk itself is wedged (which is what we are chasing).  Process context
+ * only.
+ */
+int sdlog_emit(const char *tag, const char *text, unsigned int len)
+{
+	struct mmc_card *card = sdlog_card();
+	struct sdlog_rec_hdr hdr;
+	struct mmc_host *host;
+	unsigned long lba;
+	unsigned int blocks, off;
+	int err = 0;
+
+	if (!card || !sdlog_lba || !len)
+		return -ENODEV;
+
+	if (len > SDLOG_MAX_BYTES)
+		len = SDLOG_MAX_BYTES;
+
+	blocks = 1 + DIV_ROUND_UP(len, SDLOG_BLOCK_SIZE);
+	if (blocks > SDLOG_RING_SECTORS)
+		return -EINVAL;
+
+	memcpy(sdlog_emit_buf, text, len);
+
+	mutex_lock(&sdlog_emit_mutex);
+
+	memset(&hdr, 0, sizeof(hdr));
+	hdr.magic = SDLOG_MAGIC_V2;
+	hdr.seq = sdlog_seq + 1;
+	hdr.len = len;
+	hdr.period_ms = 0;
+	hdr.boot = sdlog_boot;
+	hdr.jiffies = (u64)jiffies;
+	strncpy(hdr.tag, tag, SDLOG_TAG_LEN);
+	hdr.tag[SDLOG_TAG_LEN - 1] = '\0';
+
+	memset(sdlog_hdr_blk, 0, sizeof(sdlog_hdr_blk));
+	memcpy(sdlog_hdr_blk, &hdr, sizeof(hdr));
+
+	host = card->host;
+	mmc_claim_host(host);
+
+	if (sdlog_cursor + blocks > SDLOG_RING_SECTORS)
+		sdlog_cursor = 0;
+
+	lba = sdlog_lba + sdlog_cursor;
+	err = sdlog_write_block(card, lba++, sdlog_hdr_blk);
+
+	for (off = 0; !err && off < len; off += SDLOG_BLOCK_SIZE, lba++) {
+		unsigned int n = len - off;
+
+		if (n >= SDLOG_BLOCK_SIZE) {
+			err = sdlog_write_block(card, lba, sdlog_emit_buf + off);
+		} else {
+			memset(sdlog_pad_blk, 0, sizeof(sdlog_pad_blk));
+			memcpy(sdlog_pad_blk, sdlog_emit_buf + off, n);
+			err = sdlog_write_block(card, lba, sdlog_pad_blk);
+		}
+	}
+
+	if (!err) {
+		sdlog_cursor += blocks;
+		if (sdlog_cursor >= SDLOG_RING_SECTORS)
+			sdlog_cursor = 0;
+		sdlog_seq++;
+		sdlog_sb_slot ^= 1;
+		err = sdlog_sb_write(card);
+	}
+
+	mmc_release_host(host);
+	mutex_unlock(&sdlog_emit_mutex);
+
+	return err;
+}
+EXPORT_SYMBOL_GPL(sdlog_emit);
 
 /*
  * kmsg_dump() initialises dumper->cur_seq/next_seq and then calls this.
@@ -495,6 +585,15 @@ static int __init sdlog_init(void)
 {
 	if (!sdlog_enable)
 		return 0;
+
+	/*
+	 * The cmdline asks for 50 ms.  Each record is up to 64 KiB, so at that
+	 * rate the 8 MiB ring wraps in ~30 s and the veyron_diag reports from
+	 * the interesting window get overwritten.  A 1 s period keeps a couple
+	 * of minutes of history, which is what a hang needs.
+	 */
+	if (sdlog_period_ms < 1000)
+		sdlog_period_ms = 1000;
 
 	sdlog_dumper.dump = sdlog_capture;
 	kmsg_dump_register(&sdlog_dumper);
