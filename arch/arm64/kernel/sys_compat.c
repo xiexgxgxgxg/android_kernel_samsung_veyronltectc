@@ -24,18 +24,19 @@
 #include <linux/slab.h>
 #include <linux/syscalls.h>
 #include <linux/uaccess.h>
+#include <linux/pagemap.h>
 
 #include <asm/cacheflush.h>
 #include <asm/unistd.h>
 
-static inline void
+static inline int
 do_compat_cache_op(unsigned long start, unsigned long end, int flags)
 {
 	struct mm_struct *mm = current->active_mm;
 	struct vm_area_struct *vma;
 
 	if (end < start || flags)
-		return;
+		return -EINVAL;
 
 	down_read(&mm->mmap_sem);
 	vma = find_vma(mm, start);
@@ -45,10 +46,30 @@ do_compat_cache_op(unsigned long start, unsigned long end, int flags)
 		if (end > vma->vm_end)
 			end = vma->vm_end;
 		up_read(&mm->mmap_sem);
+
+		/*
+		 * __flush_cache_user_range() performs the cache maintenance from
+		 * kernel mode.  If a page in the range is not resident the access
+		 * faults in kernel mode, where there is no exception table entry
+		 * for the cache instructions; on this kernel that kills the
+		 * process (the 32-bit ART JIT hits this when its code cache is
+		 * under memory pressure: SIGSEGV in FlushCpuCaches()).
+		 *
+		 * Fault the pages in first with a normal get_user() based
+		 * helper, which does have fixups, then the maintenance cannot
+		 * fault.
+		 */
+		if (end - start > INT_MAX)
+			return -EINVAL;
+		if (fault_in_pages_readable((const char __user *)start,
+					    end - start))
+			return -EFAULT;
+
 		__flush_cache_user_range(start & PAGE_MASK, PAGE_ALIGN(end));
-		return;
+		return 0;
 	}
 	up_read(&mm->mmap_sem);
+	return 0;
 }
 
 /*
@@ -74,8 +95,8 @@ long compat_arm_syscall(struct pt_regs *regs)
 	 * the specified region).
 	 */
 	case __ARM_NR_compat_cacheflush:
-		do_compat_cache_op(regs->regs[0], regs->regs[1], regs->regs[2]);
-		return 0;
+		return do_compat_cache_op(regs->regs[0], regs->regs[1],
+					  regs->regs[2]);
 
 	case __ARM_NR_compat_set_tls:
 		current->thread.tp_value = regs->regs[0];
