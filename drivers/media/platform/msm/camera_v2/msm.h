@@ -34,6 +34,16 @@
  * like Long exposure usecase and isp needs max of 2 frames
  * to stop the hardware which will be around 3 seconds*/
 #define MSM_POST_EVT_TIMEOUT 6500
+/*
+ * Cold session setup.  The 6.0.1 imaging server (mm-qcamera-daemon) loads
+ * and initialises the whole mm-camera2 stack (modules, ISP, sensor probe,
+ * OIS calibration) before it starts answering the event queue.  On this
+ * Android 11 port that takes well over 6.5s, so the first NEW_SESSION event
+ * times out, the HAL tears the session down and the daemon then aborts on a
+ * double mutex destroy.  Give the first session setup a larger budget;
+ * steady-state events keep the original timeout.
+ */
+#define MSM_POST_EVT_TIMEOUT_COLD 20000
 #define MSM_POST_EVT_NOTIMEOUT 0xFFFFFFFF
 #define MSM_CAMERA_STREAM_CNT_BITS  32
 
