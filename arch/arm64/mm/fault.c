@@ -166,6 +166,7 @@ static void do_bad_area(unsigned long addr, unsigned int esr, struct pt_regs *re
 #define VM_FAULT_BADACCESS	0x020000
 
 #define ESR_LNX_EXEC		(1 << 24)
+#define ESR_CM			(1 << 8)
 
 static int __do_page_fault(struct mm_struct *mm, unsigned long addr,
 			   unsigned int mm_flags, unsigned long vm_flags,
@@ -233,7 +234,16 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
 
 	if (esr & ESR_LNX_EXEC) {
 		vm_flags = VM_EXEC;
-	} else if (esr & ESR_EL1_WRITE) {
+	} else if ((esr & ESR_EL1_WRITE) && !(esr & ESR_CM)) {
+		/*
+		 * ARMv8 reports cache maintenance (DC CV* / IC IV*) faults
+		 * with the WnR bit set even though the architecture treats
+		 * them as loads.  Handling them as writes makes the kernel
+		 * try to turn the RX JIT code mapping writable; when the VMA
+		 * is not writable that ends in SEGV_ACCERR inside
+		 * FlushCpuCaches() (the 64-bit ART JIT crash).  Treat CM
+		 * faults as reads, as mainline does.
+		 */
 		vm_flags = VM_WRITE;
 		mm_flags |= FAULT_FLAG_WRITE;
 	}
