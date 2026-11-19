@@ -741,6 +741,13 @@ struct samsung_display_driver_data {
 	int auto_brightness;
 	int prev_auto_brightness;
 	int bl_level;
+	/*
+	 * Last non-zero brightness level.  The framework programs brightness 0
+	 * before it turns the panel off, so bl_level is 0 when the panel is
+	 * powered back on.  Restore this value instead so the panel comes up at
+	 * the level the user left it at instead of the panel's power-on default.
+	 */
+	int last_bl_level;
 	int candela_level;
 	int cmd_idx;
 
@@ -986,7 +993,8 @@ void mdss_samsung_check_hw_config(struct platform_device *pdev);
 /* BRIGHTNESS RELATED FUNCTION */
 int get_cmd_index(struct samsung_display_driver_data *vdd, int ndx);
 int get_candela_value(struct samsung_display_driver_data *vdd, int ndx);
-int mdss_samsung_brightness_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level);
+int mdss_samsung_brightness_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level,
+				bool force);
 void mdss_samsung_brightness_tft_pwm(struct mdss_dsi_ctrl_pdata *ctrl, int level);
 /* TFT BL DCS RELATED FUNCTION */
 int get_scaled_level(struct samsung_display_driver_data *vdd, int ndx);
