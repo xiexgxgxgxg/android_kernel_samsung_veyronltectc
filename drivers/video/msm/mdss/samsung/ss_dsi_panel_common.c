@@ -2650,6 +2650,14 @@ int mdss_samsung_brightness_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 		return false;
 	}
 
+	/*
+	 * Every brightness change costs a synchronous DSI transfer, and the
+	 * framework repeats the same level (ramp frames, redraws).  Skip the
+	 * transfer when the panel is already at that level.
+	 */
+	if (level == vdd->bl_level)
+		return 0;
+
 	vdd->bl_level = level;
 
 	/* check the lcd id for DISPLAY_1 or DISPLAY_2 */
