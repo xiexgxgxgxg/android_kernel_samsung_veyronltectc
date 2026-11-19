@@ -593,7 +593,7 @@ static int camera_v4l2_open(struct file *filep)
 		}
 
 		camera_pack_event(filep, MSM_CAMERA_NEW_SESSION, 0, -1, &event);
-		rc = msm_post_event(&event, MSM_POST_EVT_TIMEOUT_COLD);
+		rc = msm_post_event(&event, MSM_POST_EVT_TIMEOUT);
 		if (rc < 0) {
 			pr_err("%s : posting of NEW_SESSION event failed\n",
 					__func__);
