@@ -246,7 +246,7 @@ static void mdss_dsi_panel_bklt_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 		if (pinfo->dcs_cmd_by_left && (ctrl->ndx != DSI_CTRL_LEFT))
 			return;
 		else
-			mdss_samsung_brightness_dcs(ctrl, level);
+			mdss_samsung_brightness_dcs(ctrl, level, false);
 
 		return;
 	}

@@ -786,6 +786,7 @@ void mdss_samsung_panel_init(struct device_node *np,
 
 	/* Set init brightness level */
 	vdd_data.bl_level = DEFAULT_BRIGHTNESS;
+	vdd_data.last_bl_level = DEFAULT_BRIGHTNESS;
 
 	/* Init blank_mode */
 	for (loop = 0; loop < SUPPORT_PANEL_COUNT; loop++)
@@ -1652,12 +1653,25 @@ int mdss_samsung_panel_on_post(struct mdss_panel_data *pdata)
 	if (vdd->recovery_boot_mode)
 		vdd->bl_level = DEFAULT_BRIGHTNESS;
 
+	/*
+	 * The framework programs 0 into the panel before it blanks it, so
+	 * bl_level is 0 at this point on a normal wake-up.  The panel does not
+	 * retain its brightness across a power cycle and comes up at its
+	 * default (maximum) level, which is the "screen flashes bright before
+	 * it settles at the old brightness" symptom.  Program the last
+	 * non-zero level (i.e. the level the user left the panel at) while
+	 * powering on, and force it because the panel must be reprogrammed
+	 * even if the level number did not change.
+	 */
+	if (vdd->bl_level == 0 && vdd->last_bl_level > 0)
+		vdd->bl_level = vdd->last_bl_level;
+
 	if((vdd->panel_func.color_weakness_ccb_on_off)&& vdd->color_weakness_mode)
 		vdd->panel_func.color_weakness_ccb_on_off(vdd, vdd->color_weakness_mode);
 
 	mutex_lock(&vdd->mfd_dsi[DISPLAY_1]->bl_lock);
 	if ((vdd->ctrl_dsi[DISPLAY_1]->bklt_ctrl == BL_DCS_CMD))
-		mdss_samsung_brightness_dcs(ctrl, vdd->bl_level);
+		mdss_samsung_brightness_dcs(ctrl, vdd->bl_level, true);
 	mutex_unlock(&vdd->mfd_dsi[DISPLAY_1]->bl_lock);
 
 	if (vdd->support_mdnie_lite){
@@ -2635,7 +2649,8 @@ static int mdss_samsung_single_transmission_packet(struct samsung_brightenss_dat
 	}
 }
 
-int mdss_samsung_brightness_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
+int mdss_samsung_brightness_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level,
+				bool force)
 {
 	struct samsung_display_driver_data *vdd = NULL;
 	int cmd_cnt = 0;
@@ -2654,9 +2669,17 @@ int mdss_samsung_brightness_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 	 * Every brightness change costs a synchronous DSI transfer, and the
 	 * framework repeats the same level (ramp frames, redraws).  Skip the
 	 * transfer when the panel is already at that level.
+	 *
+	 * force is used by the callers that must program the panel even when
+	 * the level is unchanged: panel power-on (the panel does not keep its
+	 * brightness across a power cycle) and the IRC/ACL sysfs updates
+	 * (they rebuild the brightness packet with new BLC/ELVSS values).
 	 */
-	if (level == vdd->bl_level)
+	if (!force && level == vdd->bl_level)
 		return 0;
+
+	if (level > 0)
+		vdd->last_bl_level = level;
 
 	vdd->bl_level = level;
 
@@ -5916,7 +5939,8 @@ static ssize_t mdss_samsung_irc_store(struct device *dev,
 
 		if (!vdd->dtsi_data[DISPLAY_1].tft_common_support) {
 			mutex_lock(&vdd->mfd_dsi[DISPLAY_1]->bl_lock);
-			mdss_samsung_brightness_dcs(vdd->ctrl_dsi[DISPLAY_1], vdd->bl_level);
+			mdss_samsung_brightness_dcs(vdd->ctrl_dsi[DISPLAY_1], vdd->bl_level,
+						     true);
 			mutex_unlock(&vdd->mfd_dsi[DISPLAY_1]->bl_lock);
 		}
 	}
@@ -6002,7 +6026,8 @@ static ssize_t mdss_samsung_adaptive_control_store(struct device *dev,
 
 	if (!vdd->dtsi_data[DISPLAY_1].tft_common_support) {
 		mutex_lock(&vdd->mfd_dsi[DISPLAY_1]->bl_lock);
-		mdss_samsung_brightness_dcs(vdd->ctrl_dsi[DISPLAY_1], vdd->bl_level);
+		mdss_samsung_brightness_dcs(vdd->ctrl_dsi[DISPLAY_1], vdd->bl_level,
+					    true);
 		mutex_unlock(&vdd->mfd_dsi[DISPLAY_1]->bl_lock);
 	}
 
