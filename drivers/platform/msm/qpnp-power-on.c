@@ -1336,6 +1336,16 @@ qpnp_pon_config_input(struct qpnp_pon *pon,  struct qpnp_pon_config *cfg)
 	/* don't send dummy release event when system resumes */
 	__set_bit(INPUT_PROP_NO_DUMMY_RELEASE, pon->pon_input->propbit);
 	input_set_capability(pon->pon_input, EV_KEY, cfg->key_code);
+	/*
+	 * The PMIC keys are real keyboard keys.  Android's InputReader only
+	 * creates a KeyboardInputMapper (and therefore only applies the
+	 * qpnp_pon.kl key layout) for devices it classifies as a keyboard, and
+	 * it derives that from the key capabilities.  Without these the W2017
+	 * hangup key (KEY_SWITCHVIDEOMODE, mapped to ENDCALL in qpnp_pon.kl)
+	 * is dropped before it ever reaches the framework.
+	 */
+	input_set_capability(pon->pon_input, EV_KEY, KEY_POWER);
+	input_set_capability(pon->pon_input, EV_KEY, KEY_ENDCALL);
 
 	return 0;
 }
