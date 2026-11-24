@@ -52,6 +52,43 @@ module_param(disable_restart_work, uint, S_IRUGO | S_IWUSR);
 static int enable_debug;
 module_param(enable_debug, int, S_IRUGO | S_IWUSR);
 
+/*
+ * Diagnostic hook: ask the PIL to bring a subsystem up from userspace.
+ *
+ * The modem is normally started by the bootloader.  When it is not (visible as
+ * /sys/bus/msm_subsys/devices/subsys4/state == OFFLINE) nothing in the kernel
+ * requests it either: the demand-boot path in the IPC router is only reached
+ * once a QMI client opens a channel to the modem edge.  Current state:
+ *
+ *   echo 1 > /sys/module/subsystem_restart/parameters/boot_modem
+ *
+ * logs whether the PIL could load the image, and turns the modem ONLINE if it
+ * could.  Keep it until the RIL userspace is up; then it is only a test knob.
+ */
+static bool boot_modem;
+static int boot_modem_set(const char *val, const struct kernel_param *kp)
+{
+	int rc = param_set_bool(val, kp);
+	void *handle;
+
+	if (rc)
+		return rc;
+	if (!boot_modem)
+		return 0;
+
+	handle = subsystem_get("modem");
+	pr_info("%s: subsystem_get(modem) -> %d\n", __func__,
+		PTR_ERR_OR_ZERO(handle));
+	return 0;
+}
+
+static const struct kernel_param_ops boot_modem_ops = {
+	.set = boot_modem_set,
+	.get = param_get_bool,
+};
+module_param_cb(boot_modem, &boot_modem_ops, &boot_modem, 0644);
+MODULE_PARM_DESC(boot_modem, "request the modem PIL bring-up (diagnostic)");
+
 static bool silent_ssr;
 static int sys_shutdown_status;
 
