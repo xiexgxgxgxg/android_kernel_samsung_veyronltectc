@@ -296,32 +296,9 @@ static int max98506_spk_ramp_get(struct snd_kcontrol *kcontrol,
 			MAX98506_SPK_RMP_EN_MASK, MAX98506_SPK_RMP_EN_SHIFT);
 }
 
-/*
- * The ALSA audio_route library resets every control of the active path to its
- * initial value when a stream goes to standby.  It writes Speaker Ramp=Off
- * (and ZCD=Off) while the speaker amplifier is still powered, which is
- * audible as a pop at the end of playback.  Keep the ramp/ZCD enabled as
- * long as R038 GLOBAL_ENABLE says the amplifier is on; the ramp is cleared
- * when the amp is actually disabled.
- */
-static int max98506_spk_is_enabled(struct snd_kcontrol *kcontrol)
-{
-	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
-	struct max98506_priv *max98506 = snd_soc_codec_get_drvdata(codec);
-	unsigned int val = 0;
-
-	regmap_read(max98506->regmap, MAX98506_R038_GLOBAL_ENABLE, &val);
-	return !!(val & MAX98506_EN_MASK);
-}
-
 static int max98506_spk_ramp_put(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
-	if (!ucontrol->value.integer.value[0] &&
-			max98506_spk_is_enabled(kcontrol)) {
-		msg_maxim("keep ramp enabled while speaker is on");
-		return 0;
-	}
 	return max98506_reg_put(kcontrol, ucontrol, MAX98506_R02E_GAIN_RAMPING,
 			MAX98506_SPK_RMP_EN_MASK, MAX98506_SPK_RMP_EN_SHIFT);
 }
@@ -336,11 +313,6 @@ static int max98506_spk_zcd_get(struct snd_kcontrol *kcontrol,
 static int max98506_spk_zcd_put(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
-	if (!ucontrol->value.integer.value[0] &&
-			max98506_spk_is_enabled(kcontrol)) {
-		msg_maxim("keep zcd enabled while speaker is on");
-		return 0;
-	}
 	return max98506_reg_put(kcontrol, ucontrol, MAX98506_R02E_GAIN_RAMPING,
 			MAX98506_SPK_ZCD_EN_MASK, MAX98506_SPK_ZCD_EN_SHIFT);
 }
