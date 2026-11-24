@@ -2437,13 +2437,23 @@ static int mdss_panel_parse_dt(struct device_node *np,
 		"qcom,mdss-dsi-border-color", &tmp);
 	pinfo->lcdc.border_clr = (!rc ? tmp : 0);
 	data = of_get_property(np, "qcom,mdss-dsi-panel-orientation", NULL);
-#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
-	/* pipe flip is unsafe when overlay, so we define ro.sf.hwrotation
-	to enable SF flip, and use pipe flip in recovery and LPM mode */
-	if (data && (is_boot_recovery || poweroff_charging)) {
-#else
+	/*
+	 * The Samsung BSP only applies the pipe flip when the kernel was booted
+	 * for recovery or for LPM charging, because their stock framework does
+	 * the rotation itself (ro.sf.hwrotation).  Both of those globals come
+	 * from the bootloader command line (androidboot.boot_recovery), so with
+	 * the upstream behaviour the panel of this board - which is mounted
+	 * upside down and declares qcom,mdss-dsi-panel-orientation = "180" -
+	 * only comes out upright when LK happens to pass boot_recovery=1.
+	 *
+	 * This port boots the same image both as a normal system boot and from
+	 * the recovery slot, and its framework is configured with
+	 * ro.surface_flinger.primary_display_orientation=ORIENTATION_0, i.e. it
+	 * expects the kernel to do the flip.  Take the orientation from the DT
+	 * in every boot mode so the UI is upright no matter which way LK picks
+	 * the slot.
+	 */
 	if (data) {
-#endif
 		pr_debug("panel orientation is %s\n", data);
 		if (!strcmp(data, "180"))
 			pinfo->panel_orientation = MDP_ROT_180;
