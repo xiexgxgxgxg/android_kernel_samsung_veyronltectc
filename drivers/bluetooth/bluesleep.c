@@ -127,6 +127,29 @@ DECLARE_DELAYED_WORK(uart_awake_workqueue, bluesleep_uart_awake_work);
 
 static bool bt_enabled;
 
+/*
+ * Keep the Bluetooth HSUART clocked (and RTS asserted) while the controller is
+ * idle instead of powering it down one second after the host stops writing.
+ *
+ * With the stock behaviour every idle period ends with
+ *   hsuart_power off / HS Uart clock off
+ * and the next HCI command depends on the host_wake/ext_wake handshake to get
+ * the port back.  When that handshake is late the command never reaches the
+ * controller, and the Bluetooth stack does exactly what it is supposed to:
+ *   2 s without a response -> request a controller firmware dump
+ *   5 s later              -> hci_timeout_abort(), the process is aborted and
+ *                             restarted (observed as "Bluetooth crashes the
+ *                             first time you pair after boot, then works").
+ *
+ * Keeping the port clocked costs a few mA while Bluetooth is on, but removes
+ * the window in which a command can be lost.  Runtime switch:
+ *   /sys/module/bluesleep/parameters/keep_hsuart_on
+ */
+static bool keep_hsuart_on = true;
+module_param_named(keep_hsuart_on, keep_hsuart_on, bool, 0644);
+MODULE_PARM_DESC(keep_hsuart_on,
+	"keep the Bluetooth HSUART clocked while the controller is idle");
+
 static struct platform_device *bluesleep_uart_dev;
 static struct bluesleep_info *bsi;
 
@@ -223,6 +246,10 @@ static void hsuart_power(int on)
 		msm_hs_request_clock_on(bsi->uport);
 		msm_hs_set_mctrl(bsi->uport, TIOCM_RTS);
 	} else {
+		if (keep_hsuart_on && bt_enabled) {
+			BT_DBG("hsuart_power off requested, keeping the HSUART clocked");
+			return;
+		}
 		BT_DBG("hsuart_power off");
 		msm_hs_set_mctrl(bsi->uport, 0);
 		msm_hs_request_clock_off(bsi->uport);
