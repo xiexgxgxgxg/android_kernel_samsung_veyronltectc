@@ -25,6 +25,8 @@
  * $Id: dhd_linux.c 633120 2016-04-21 13:26:05Z $
  */
 
+extern void w2017_trace_sync(const char *fmt, ...);
+#define W2017S(fmt, ...) w2017_trace_sync("W2017T: %s: " fmt "\n", __func__, ##__VA_ARGS__)
 #include <typedefs.h>
 #include <linuxver.h>
 #include <osl.h>
@@ -522,6 +524,139 @@ typedef struct dhd_info {
 
 /* Flag to indicate if we should download firmware on driver load */
 uint dhd_download_fw_on_driverload = TRUE;
+
+/* W2017: soft AP / dongle reset workaround.
+ *
+ * When the netdev is stopped the driver normally calls wl_android_wifi_off(),
+ * which does a full dongle reset (dhd_bus_devreset(TRUE): bus stop, prot
+ * clear, release dongle, free resources, PCIe RC off, WL_REG_ON low).  The
+ * next dhd_open() re-downloads the firmware and rebuilds all 42 flowrings.
+ * On this board that "reset + re-download" right after a soft AP session
+ * hard-hangs the whole SoC a second or two later (NoC watchdog stops being
+ * petted, no oops) - i.e. every "change hotspot name/password" or
+ * "stop hotspot then start it again" bricks the device.
+ *
+ * The control experiment shows a dongle reset *without* an AP session is
+ * harmless, so we keep the dongle (and the PCIe link) alive across a netdev
+ * down/up instead and let an AP restart be nothing but a BSS rebuild.
+ *
+ * Values:
+ *   0 = never skip (default: the old, full dongle power cycle)
+ *   1 = skip while a soft AP was active in the last w2017_warm_window_ms
+ *   2 = always skip (chip stays powered the whole time)
+ *
+ * NOTE (measured 2026-11-26): with 1 or 2 the dongle really stays up and a
+ * quick rename works (8 back-to-back SSID changes, flowring 41 re-created,
+ * "Flow create Response status = 0" every time).  BUT if the framework fully
+ * disables wi-fi between the AP stop and the next start, the vendor HAL
+ * (android.hardware.wifi@1.0-service) crashes in
+ * WifiStaIface::WifiStaIface() -> wifi_set_nodfs_flag() -> getHalInfo()
+ * (NULL deref), and the next start-softap then silently does nothing until
+ * wi-fi is toggled again.  So this is opt-in only; keep the default 0.
+ */
+int w2017_skip_wifi_off;	/* 0: full power cycle (warm does not fix the freeze) */
+unsigned int w2017_n_warm, w2017_n_cold;
+
+/* W2017: bisect the dhd_stop teardown that runs while a soft AP session still
+ * exists.  0 = do everything (old behaviour).
+ *   0x1 skip wl_cfg80211_down()
+ *   0x2 skip dhd_if_flush_sta()
+ *   0x4 skip the virtual-interface removal + notifier unregister block
+ */
+int w2017_stop_skip;
+module_param_named(w2017_stop_skip, w2017_stop_skip, int, 0644);
+/* 0x8: make dhd_stop a no-op while a soft AP is up, i.e. let Android's
+ * "wifi down" during a hotspot rename do nothing at all - stock Android 6
+ * restarted the AP in place and never took wlan0 down. */
+int w2017_stop_noop;
+module_param_named(w2017_stop_noop, w2017_stop_noop, int, 0644);
+
+/* W2017: 1 = never create the multicast flowring (flow 41) - test knob. */
+/* W2017: 1 = treat the loaded firmware as the AP capable one (see
+ * dhd_net_set_fw_path).  The HAL loads the station image even for a soft AP. */
+int w2017_force_ap_fw = 2;	/* auto: AP preinit branch only when apsta was loaded */
+module_param_named(w2017_force_ap_fw, w2017_force_ap_fw, int, 0644);
+
+int w2017_no_mcast_flow;
+module_param_named(w2017_no_mcast_flow, w2017_no_mcast_flow, int, 0644);
+
+/* W2017: 1 Hz "is the dongle still answering?" probe.  If the dongle's
+ * firmware dies first and only then the SoC freezes, the ping goes bad before
+ * the silence - that tells us which side to fix. */
+static dhd_pub_t *w2017_ping_pub;
+static int w2017_ping_started;
+static struct delayed_work w2017_ping_w;
+int w2017_ping_ms = 1000;
+module_param_named(w2017_ping_ms, w2017_ping_ms, int, 0644);
+
+static void w2017_ping_workfn(struct work_struct *w)
+{
+	uint32 magic = 0;
+	int ret = -1;
+	unsigned long t0 = jiffies;
+	dhd_pub_t *pub = w2017_ping_pub;
+
+	{
+		/* W2017: three probes, each announced *before* it is issued, so
+		 * the last line on the card says which side stopped answering:
+		 *   A = RC's own config space, B = endpoint config space over the
+		 *   link, C = a normal driver ioctl to the firmware. */
+		struct pci_dev *rc = pci_get_bus_and_slot(0, 0);
+		struct pci_dev *ep = pci_get_bus_and_slot(1, 0);
+		u32 v;
+
+		pr_err("W2017T: ping A (rc cfg)\n");
+		if (rc) { pci_read_config_dword(rc, 0, &v); pr_err("W2017T: ping rc=0x%x\n", v); }
+		pr_err("W2017T: ping B (ep cfg)\n");
+		if (ep) { pci_read_config_dword(ep, 0, &v); pr_err("W2017T: ping ep=0x%x\n", v); }
+		pr_err("W2017T: ping C (ioctl)\n");
+		if (pub && pub->up)
+			ret = dhd_wl_ioctl_cmd(pub, WLC_GET_MAGIC, &magic,
+				sizeof(magic), FALSE, 0);
+		if (rc)
+			pci_dev_put(rc);
+		if (ep)
+			pci_dev_put(ep);
+	}
+	pr_err("W2017T: ping D ret=%d magic=0x%x up=%d busstate=%d took=%ums\n",
+		ret, magic, pub ? pub->up : -1, pub ? pub->busstate : -1,
+		jiffies_to_msecs(jiffies - t0));
+	schedule_delayed_work(&w2017_ping_w,
+		msecs_to_jiffies(w2017_ping_ms > 0 ? w2017_ping_ms : 1000));
+}
+static void w2017_ping_start(dhd_info_t *dhd)
+{
+	if (w2017_ping_started)
+		return;
+	w2017_ping_started = 1;
+	w2017_ping_pub = &dhd->pub;
+	INIT_DELAYED_WORK(&w2017_ping_w, w2017_ping_workfn);
+	schedule_delayed_work(&w2017_ping_w, HZ);
+}
+module_param_named(w2017_skip_wifi_off, w2017_skip_wifi_off, int, 0644);
+
+int w2017_warm_window_ms = 30000;
+module_param_named(w2017_warm_window_ms, w2017_warm_window_ms, int, 0644);
+
+/* jiffies of the last soft AP start/stop, maintained by wl_cfg80211.c */
+extern unsigned long w2017_ap_active_jiffies;
+extern int w2017_ap_up;
+
+bool w2017_warm_restart(void)
+{
+	if (w2017_skip_wifi_off <= 0)
+		return FALSE;
+	if (w2017_skip_wifi_off >= 2)
+		return TRUE;
+	/* a soft AP is (still) running: never power-cycle the dongle behind it */
+	if (w2017_ap_up)
+		return TRUE;
+	if (!w2017_ap_active_jiffies)
+		return FALSE;
+	return time_before(jiffies, w2017_ap_active_jiffies +
+		msecs_to_jiffies(w2017_warm_window_ms > 0 ?
+			w2017_warm_window_ms : 30000));
+}
 
 /* Definitions to provide path to the firmware and nvram
  * example nvram_path[MOD_PARAM_PATHLEN]="/projects/wlan/nvram.txt"
@@ -4225,6 +4360,13 @@ dhd_stop(struct net_device *net)
 	int ifidx = 0;
 	dhd_info_t *dhd = DHD_DEV_INFO(net);
 	DHD_OS_WAKE_LOCK(&dhd->pub);
+	if (w2017_stop_noop) {
+		extern int w2017_ap_up;
+		if (w2017_ap_up) {
+			W2017S("dhd_stop NOOP (AP up) - leave everything running");
+			return 0;
+		}
+	}
 	DHD_PERIM_LOCK(&dhd->pub);
 	DHD_TRACE(("%s: Enter %p\n", __FUNCTION__, net));
 
@@ -4238,7 +4380,8 @@ dhd_stop(struct net_device *net)
 		goto exit;
 	}
 
-	dhd_if_flush_sta(DHD_DEV_IFP(net));
+	if (!(w2017_stop_skip & 0x2))
+		dhd_if_flush_sta(DHD_DEV_IFP(net));
 
 #if defined(CUSTOMER_HW4) && defined(FIX_CPU_MIN_CLOCK)
 	if (dhd_get_fw_mode(dhd) == DHD_FLAG_HOSTAP_MODE)
@@ -4254,13 +4397,14 @@ dhd_stop(struct net_device *net)
 
 #ifdef WL_CFG80211
 	if (ifidx == 0) {
-		wl_cfg80211_down(NULL);
+		if (!(w2017_stop_skip & 0x1))
+			wl_cfg80211_down(NULL);
 
 		/*
 		 * For CFG80211: Clean up all the left over virtual interfaces
 		 * when the primary Interface is brought down. [ifconfig wlan0 down]
 		 */
-		if (!dhd_download_fw_on_driverload) {
+		if (!dhd_download_fw_on_driverload && !(w2017_stop_skip & 0x4)) {
 			if ((dhd->dhd_state & DHD_ATTACH_STATE_ADD_IF) &&
 				(dhd->dhd_state & DHD_ATTACH_STATE_CFG80211)) {
 				int i;
@@ -4311,8 +4455,25 @@ dhd_stop(struct net_device *net)
 	OLD_MOD_DEC_USE_COUNT;
 exit:
 #if defined(WL_CFG80211)
-	if (ifidx == 0 && !dhd_download_fw_on_driverload)
-		wl_android_wifi_off(net);
+	if (ifidx == 0 && !dhd_download_fw_on_driverload) {
+		if (w2017_warm_restart()) {
+			w2017_n_warm++;
+			/* W2017: keep the dongle (and the PCIe link) running.
+			 * A dongle reset + firmware re-download on a box that
+			 * just had a soft AP session wedges the SoC, so an AP
+			 * restart becomes a plain BSS rebuild instead. */
+			W2017S("tail: wifi_off SKIPPED (warm restart, busstate=%d up=%d)",
+				dhd->pub.busstate, dhd->pub.up);
+		} else {
+			w2017_n_cold++;
+			W2017S("tail: wifi_off taken (cold, busstate=%d cold#%u ap_up=%d "
+				"ap_j=%lu now=%lu win=%d)",
+				dhd->pub.busstate, w2017_n_cold, w2017_ap_up,
+				w2017_ap_active_jiffies, (unsigned long)jiffies,
+				w2017_warm_window_ms);
+			wl_android_wifi_off(net);
+		}
+	}
 #ifdef SUPPORT_DEEP_SLEEP
 	else {
 		/* CSP#505233: Flags to indicate if we distingish
@@ -4327,6 +4488,7 @@ exit:
 #endif /* SUPPORT_DEEP_SLEEP */
 #endif 
 
+	W2017S("tail: wifi_off returned, hang_was_sent=0");
 	dhd->pub.hang_was_sent = 0;
 
 	/* Clear country spec for for built-in type driver */
@@ -4336,15 +4498,19 @@ exit:
 		dhd->pub.dhd_cspec.ccode[0] = 0x00;
 	}
 
+	W2017S("tail: perim unlock");
 	DHD_PERIM_UNLOCK(&dhd->pub);
+	W2017S("tail: wake unlock");
 	DHD_OS_WAKE_UNLOCK(&dhd->pub);
 
 	/* Destroy wakelock */
 	if (!dhd_download_fw_on_driverload &&
 		(dhd->dhd_state & DHD_ATTACH_STATE_WAKELOCKS_INIT)) {
+		W2017S("tail: wakelock destroy");
 		DHD_OS_WAKE_LOCK_DESTROY(dhd);
 		dhd->dhd_state &= ~DHD_ATTACH_STATE_WAKELOCKS_INIT;
 	}
+	W2017S("tail: dhd_stop returning 0");
 
 	return 0;
 }
@@ -4449,6 +4615,8 @@ dhd_open(struct net_device *net)
 	ifidx = dhd_net2idx(dhd, net);
 	DHD_TRACE(("%s: ifidx %d\n", __FUNCTION__, ifidx));
 
+	w2017_ping_start(dhd);
+
 	if (ifidx < 0) {
 		DHD_ERROR(("%s: Error: called with invalid IF\n", __FUNCTION__));
 		ret = -1;
@@ -4476,6 +4644,8 @@ dhd_open(struct net_device *net)
 				ret = -1;
 				goto exit;
 			}
+			W2017S("dhd_open: wifi_on done ret=%d busstate=%d",
+				ret, dhd->pub.busstate);
 		}
 #ifdef SUPPORT_DEEP_SLEEP
 		else {
@@ -5822,6 +5992,19 @@ int
 dhd_preinit_ioctls(dhd_pub_t *dhd)
 {
 	int ret = 0;
+
+	{
+		extern bool ap_fw_loaded;
+		extern int w2017_last_fw_ap;
+		/* w2017_force_ap_fw: 0 = off, 1 = always the AP branch,
+		 * 2 = follow the firmware that was actually loaded (stock
+		 * behaviour: apsta -> AP branch, sta -> station branch) */
+		if (w2017_force_ap_fw == 1 || (w2017_force_ap_fw == 2 &&
+		    w2017_last_fw_ap)) {
+			ap_fw_loaded = TRUE;
+			W2017S("preinit: AP branch (fw_ap=%d)", w2017_last_fw_ap);
+		}
+	}
 	char eventmask[WL_EVENTING_MASK_LEN];
 	char iovbuf[WL_EVENTING_MASK_LEN + 12];	/*  Room for "event_msgs" + '\0' + bitvec  */
 	uint32 buf_key_b4_m4 = 1;
@@ -9043,7 +9226,14 @@ int dhd_net_set_fw_path(struct net_device *dev, char *fw)
 	dhd->fw_path[sizeof(dhd->fw_path)-1] = '\0';
 
 #if defined(SOFTAP)
-	if (strstr(fw, "apsta") != NULL) {
+	if (w2017_force_ap_fw) {
+		/* W2017: the Android 11 HAL loads bcmdhd_sta.bin even for a soft
+		 * AP, which makes the driver take the STA branch of
+		 * dhd_preinit_ioctls (keep-alive + ARP offload on, DTIM not
+		 * set) while an AP is running.  Force the AP branch. */
+		W2017S("fw path %s -> ap_fw_loaded forced TRUE", fw);
+		ap_fw_loaded = TRUE;
+	} else if (strstr(fw, "apsta") != NULL) {
 		DHD_INFO(("GOT APSTA FIRMWARE\n"));
 		ap_fw_loaded = TRUE;
 	} else {

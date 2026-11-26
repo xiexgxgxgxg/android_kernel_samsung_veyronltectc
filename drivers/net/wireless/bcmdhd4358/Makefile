@@ -648,6 +648,9 @@ DHDCFLAGS += -include "dhd_sec_feature.h"
 EXTRA_CFLAGS += $(DHDCFLAGS) -DDHD_DEBUG
 EXTRA_CFLAGS += -DSRCBASE=\"$(src)\"
 EXTRA_CFLAGS += -I$(src)/include/ -I$(src)/
+# W2017: the AP restart debug markers are statements placed before the local
+# declarations of the instrumented functions.
+EXTRA_CFLAGS += -Wno-declaration-after-statement
 KBUILD_CFLAGS += -I$(LINUXDIR)/include -I$(shell pwd)
 
 DHDOFILES := dhd_pno.o dhd_common.o dhd_ip.o dhd_custom_gpio.o dhd_custom_sec.o \

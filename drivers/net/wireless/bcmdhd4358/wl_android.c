@@ -24,6 +24,8 @@
  * $Id: wl_android.c 637219 2016-05-12 02:38:26Z $
  */
 
+extern void w2017_trace_sync(const char *fmt, ...);
+#define W2017S(fmt, ...) w2017_trace_sync("W2017T: %s: " fmt "\n", __func__, ##__VA_ARGS__)
 #include <linux/module.h>
 #include <linux/netdevice.h>
 #include <net/netlink.h>
@@ -2031,6 +2033,8 @@ int wl_android_wifi_on(struct net_device *dev)
 		}
 #endif /* !BCMPCIE */
 		g_wifi_on = TRUE;
+	} else {
+		W2017S("wifi_on: already on, dongle left running (warm restart)");
 	}
 
 exit:
@@ -2051,25 +2055,53 @@ int wl_android_wifi_off(struct net_device *dev)
 
 	dhd_net_if_lock(dev);
 	if (g_wifi_on) {
+		W2017S("wifi_off: enter");
 #if defined(BCMSDIO) || defined(BCMPCIE)
 		ret = dhd_net_bus_devreset(dev, TRUE);
+		W2017S("wifi_off: devreset returned %d", ret);
 #ifdef BCMSDIO
 		dhd_net_bus_suspend(dev);
 #endif /* BCMSDIO */
 #endif /* BCMSDIO || BCMPCIE */
+		W2017S("wifi_off: calling platform_set_power(FALSE)");
 		dhd_net_wifi_platform_set_power(dev, FALSE, WIFI_TURNOFF_DELAY);
+		W2017S("wifi_off: platform power off done");
 		g_wifi_on = FALSE;
 	}
 	dhd_net_if_unlock(dev);
+	W2017S("wifi_off: exit ret=%d", ret);
 
 	return ret;
 }
 
+/* W2017: the framework's hotspot restart ends up loading the station-only
+ * firmware (bcmdhd_sta.bin) and then brings the soft AP up on it; every
+ * frozen boot shows that.  Force the AP+STA image instead and see whether the
+ * freeze disappears. */
+int w2017_force_apsta = 2;	/* auto: apsta for AP sessions, sta otherwise */
+module_param_named(w2017_force_apsta, w2017_force_apsta, int, 0644);
+
 static int wl_android_set_fwpath(struct net_device *net, char *command, int total_len)
 {
+	char *p = command + strlen(CMD_SETFWPATH) + 1;
+
 	if ((strlen(command) - strlen(CMD_SETFWPATH)) > MOD_PARAM_PATHLEN)
 		return -1;
-	return dhd_net_set_fw_path(net, command + strlen(CMD_SETFWPATH) + 1);
+	if (w2017_force_apsta) {
+		char *s = strstr(p, "bcmdhd_sta.bin");
+		if (s) {
+			char buf[256];
+			int pre = (int)(s - p);
+			if (pre > 200)
+				pre = 200;
+			memcpy(buf, p, pre);
+			strcpy(buf + pre, "bcmdhd_apsta.bin");
+			strcat(buf, s + strlen("bcmdhd_sta.bin"));
+			W2017S("fwpath: %s -> %s", p, buf);
+			return dhd_net_set_fw_path(net, buf);
+		}
+	}
+	return dhd_net_set_fw_path(net, p);
 }
 
 
@@ -3744,7 +3776,9 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 #ifdef SUPPORT_DEEP_SLEEP
 		trigger_deep_sleep = 1;
 #else
+		W2017S("priv_cmd STOP: calling wifi_off");
 		bytes_written = wl_android_wifi_off(net);
+		W2017S("priv_cmd STOP: wifi_off returned %d", bytes_written);
 #endif /* SUPPORT_DEEP_SLEEP */
 	}
 	else if (strnicmp(command, CMD_SCAN_ACTIVE, strlen(CMD_SCAN_ACTIVE)) == 0) {

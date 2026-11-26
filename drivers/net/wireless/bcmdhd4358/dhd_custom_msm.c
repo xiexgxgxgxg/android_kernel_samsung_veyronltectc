@@ -38,6 +38,10 @@
 #include <linux/fcntl.h>
 #include <linux/fs.h>
 #include <linux/of_gpio.h>
+
+extern int w2017_chip_off;
+int w2017_keep_wl_power;	/* 1: never drop WL_REG_ON (experiment) */
+module_param_named(w2017_keep_wl_power, w2017_keep_wl_power, int, 0644);
 #ifdef CONFIG_ARCH_MSM8996
 #include <linux/msm_pcie.h>
 #endif /* CONFIG_ARCH_MSM8996 */
@@ -129,6 +133,7 @@ dhd_wlan_power(int onoff)
 	printk(KERN_INFO"%s Enter: power %s\n", __func__, onoff ? "on" : "off");
 
 	if (onoff) {
+		w2017_chip_off = 0;
 		if (gpio_direction_output(wlan_pwr_on, 1)) {
 			printk(KERN_ERR "%s: WL_REG_ON is failed to pull up\n", __FUNCTION__);
 			return -EIO;
@@ -144,6 +149,12 @@ dhd_wlan_power(int onoff)
 			}
 		}
 	} else {
+		if (w2017_keep_wl_power) {
+			pr_err("W2017T: WL_REG_ON low SKIPPED (w2017_keep_wl_power=1)\n");
+			return 0;
+		}
+		w2017_chip_off = 1;
+		pr_err("W2017T: WL_REG_ON low -> chip off, dhd pci accesses will be skipped\n");
 		if (gpio_direction_output(wlan_pwr_on, 0)) {
 			printk(KERN_ERR "%s: WL_REG_ON is failed to pull up\n", __FUNCTION__);
 			return -EIO;

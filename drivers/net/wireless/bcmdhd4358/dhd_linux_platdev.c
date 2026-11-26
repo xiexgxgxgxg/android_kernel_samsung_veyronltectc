@@ -23,6 +23,8 @@
  *
  * $Id: dhd_linux_platdev.c 401742 2013-05-13 15:03:21Z $
  */
+extern void w2017_trace_sync(const char *fmt, ...);
+#define W2017S(fmt, ...) w2017_trace_sync("W2017T: %s: " fmt "\n", __func__, ##__VA_ARGS__)
 #include <typedefs.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -156,16 +158,25 @@ int wifi_platform_get_irq_number(wifi_adapter_info_t *adapter, unsigned long *ir
 	return adapter->irq_num;
 }
 
+extern int w2017_keep_wl_power;	/* defined in dhd_custom_msm.c */
+
 int wifi_platform_set_power(wifi_adapter_info_t *adapter, bool on, unsigned long msec)
 {
 	int err = 0;
 #ifdef CONFIG_DTS
+	W2017S("enter on=%d keep=%d", on ? 1 : 0, w2017_keep_wl_power);
 	if (on) {
 		err = regulator_enable(wifi_regulator);
 		is_power_on = TRUE;
 	}
+	else if (w2017_keep_wl_power) {
+		/* experiment: leave the WLAN rail powered on */
+		W2017S("regulator_disable SKIPPED");
+		is_power_on = TRUE;
+	}
 	else {
 		err = regulator_disable(wifi_regulator);
+		W2017S("regulator_disable returned %d", err);
 		is_power_on = FALSE;
 	}
 	if (err < 0)

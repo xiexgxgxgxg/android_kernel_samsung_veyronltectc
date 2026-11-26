@@ -26,6 +26,13 @@
 
 
 /* include files */
+extern int w2017_keep_wl_power;
+
+/* W2017: clear the endpoint's ASPM (L0s/L1) control bits.  Every freeze is a
+ * PCIe access that never completes while 1 Hz ioctls still answer a second
+ * earlier - i.e. the link stops waking up. */
+int w2017_ep_noaspm;
+module_param_named(w2017_ep_noaspm, w2017_ep_noaspm, int, 0644);
 #include <typedefs.h>
 #include <bcmutils.h>
 #include <bcmdevs.h>
@@ -906,6 +913,11 @@ dhdpcie_start_host_pcieclock(dhd_bus_t *bus)
 		return BCME_ERROR;
 
 #ifdef CONFIG_ARCH_MSM
+	if (w2017_keep_wl_power) {
+		DHD_ERROR(("%s: RC resume SKIPPED (w2017_keep_wl_power)\n",
+			__FUNCTION__));
+		goto done;
+	}
 #ifdef SUPPORT_LINKDOWN_RECOVERY
 	if (bus->no_cfg_restore) {
 		options = MSM_PCIE_CONFIG_NO_CFG_RESTORE;
@@ -950,6 +962,14 @@ dhdpcie_stop_host_pcieclock(dhd_bus_t *bus)
 		return BCME_ERROR;
 
 #ifdef CONFIG_ARCH_MSM
+	if (w2017_keep_wl_power) {
+		/* W2017 experiment: keep the PCIe RC alive across wifi off/on.
+		 * The RC disable/enable cycle is what hangs the SoC when the
+		 * softap configuration changes. */
+		DHD_ERROR(("%s: RC suspend SKIPPED (w2017_keep_wl_power)\n",
+			__FUNCTION__));
+		goto done;
+	}
 #ifdef SUPPORT_LINKDOWN_RECOVERY
 	if (bus->no_cfg_restore) {
 		options = MSM_PCIE_CONFIG_NO_CFG_RESTORE | MSM_PCIE_CONFIG_LINKDOWN;
@@ -1029,6 +1049,20 @@ dhdpcie_enable_device(dhd_bus_t *bus)
 		pci_disable_device(bus->dev);
 	} else {
 		pci_set_master(bus->dev);
+		if (w2017_ep_noaspm) {
+			int cap = pci_find_capability(bus->dev, PCI_CAP_ID_EXP);
+			if (cap) {
+				u16 lnkctl = 0;
+				pci_read_config_word(bus->dev,
+					cap + PCI_EXP_LNKCTL, &lnkctl);
+				pci_write_config_word(bus->dev,
+					cap + PCI_EXP_LNKCTL, lnkctl & ~0x3);
+				pci_read_config_word(bus->dev,
+					cap + PCI_EXP_LNKCTL, &lnkctl);
+				pr_err("W2017T: EP ASPM cleared, lnkctl=0x%x\n",
+					lnkctl);
+			}
+		}
 	}
 
 	return ret;

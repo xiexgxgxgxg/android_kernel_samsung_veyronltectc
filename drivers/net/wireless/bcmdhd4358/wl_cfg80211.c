@@ -78,6 +78,97 @@
 #include <dhd_flowring.h>
 #endif
 
+#include <linux/io.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
+
+/* W2017: durable trace -- printk plus an immediate SD-card record so the
+ * line survives a hard lockup.  Only call from process context. */
+extern int sdlog_emit(const char *tag, const char *text, unsigned int len);
+
+/* 1: also push every trace line to the SD card synchronously (survives a hard
+ * lockup, but each line costs an SD write and perturbs timing -- which can
+ * hide the very race we are chasing).  Off by default. */
+int w2017_sync_trace;
+module_param_named(w2017_sync_trace, w2017_sync_trace, int, 0644);
+
+/* jiffies of the last soft AP start/stop request.  dhd_stop() uses this to
+ * decide whether a netdev down is an AP reconfigure (keep the dongle alive,
+ * see w2017_skip_wifi_off in dhd_linux.c) or a genuine wi-fi off (full
+ * dongle power cycle, as before). */
+unsigned long w2017_ap_active_jiffies;
+/* 1 while a soft AP is up; the netdev is taken down right after a stop_ap or
+ * while the AP is still running, and both cases must not reset the dongle. */
+int w2017_ap_up;
+
+void w2017_trace_sync(const char *fmt, ...)
+{
+	char b[256];
+	va_list args;
+	int n;
+
+	va_start(args, fmt);
+	n = vsnprintf(b, sizeof(b), fmt, args);
+	va_end(args);
+	if (n <= 0)
+		return;
+	pr_err("%s", b);
+	if (w2017_sync_trace && !in_interrupt() && !irqs_disabled() && !in_atomic())
+		sdlog_emit("w2017", b, n);
+}
+
+/* shared with dhd_*.c so every trace line goes through one helper */
+void w2017_trace(const char *fmt, ...)
+{
+	char b[256];
+	va_list args;
+	int n;
+
+	va_start(args, fmt);
+	n = vsnprintf(b, sizeof(b), fmt, args);
+	va_end(args);
+	if (n > 0)
+		pr_err("%s", b);
+}
+
+#define W2017T(fmt, ...) \
+	w2017_trace_sync("W2017T: %s: " fmt "\n", __func__, ##__VA_ARGS__)
+
+/* W2017 bring-up: 1Hz liveness ticks.  When the box hard-hangs the last tick
+ * tells how long after the last driver trace it died.  Debug kernel only. */
+static unsigned long w2017_hb_count;
+static struct delayed_work w2017_hb_work;
+static void w2017_heartbeat(struct work_struct *work)
+{
+	extern unsigned long w2017_act_jiffies, w2017_act_pc;
+	extern int w2017_act_kind;
+	extern char w2017_act_name[];
+	extern unsigned int w2017_n_cfg_r, w2017_n_cfg_w, w2017_n_cmn,
+		w2017_n_bell, w2017_n_isr, w2017_n_ioctl, w2017_n_dpc;
+	extern unsigned int w2017_n_msi, w2017_n_aer, w2017_n_ld, w2017_n_wake;
+	extern unsigned int w2017_n_warm, w2017_n_cold;
+	extern unsigned int w2017_aer_unc, w2017_aer_cor;
+
+	pr_err("W2017T: alive %lu jiffies=%lu cpu=%d\n",
+		w2017_hb_count++, (unsigned long)jiffies,
+		raw_smp_processor_id());
+	pr_err("W2017T: act cfg_r=%u cfg_w=%u cmn=%u bell=%u isr=%u ioctl=%u dpc=%u "
+		"last k=%d pc=%lx ago=%ums nm=%s\n",
+		w2017_n_cfg_r, w2017_n_cfg_w, w2017_n_cmn, w2017_n_bell,
+		w2017_n_isr, w2017_n_ioctl, w2017_n_dpc, w2017_act_kind,
+		w2017_act_pc,
+		jiffies_to_msecs(jiffies - w2017_act_jiffies), w2017_act_name);
+	pr_err("W2017T: pcie msi=%u aer=%u ld=%u wake=%u warm=%u cold=%u aerst=%x/%x\n",
+		w2017_n_msi, w2017_n_aer, w2017_n_ld, w2017_n_wake,
+		w2017_n_warm, w2017_n_cold, w2017_aer_unc, w2017_aer_cor);
+	schedule_delayed_work(&w2017_hb_work, HZ);
+}
+static void w2017_heartbeat_start(void)
+{
+	INIT_DELAYED_WORK(&w2017_hb_work, w2017_heartbeat);
+	schedule_delayed_work(&w2017_hb_work, HZ);
+}
+
 #ifdef WL11U
 #if !defined(WL_ENABLE_P2P_IF) && !defined(WL_CFG80211_P2P_DEV_IF)
 #error You should enable 'WL_ENABLE_P2P_IF' or 'WL_CFG80211_P2P_DEV_IF' \
@@ -1460,6 +1551,7 @@ wl_cfg80211_add_virtual_iface(struct wiphy *wiphy,
 	enum nl80211_iftype type, u32 *flags,
 	struct vif_params *params)
 {
+	W2017T("enter");
 	s32 err;
 	s32 timeout = -1;
 	s32 wlif_type = -1;
@@ -1732,6 +1824,7 @@ fail:
 static s32
 wl_cfg80211_del_virtual_iface(struct wiphy *wiphy, bcm_struct_cfgdev *cfgdev)
 {
+	W2017T("enter");
 	struct net_device *dev = NULL;
 	struct ether_addr p2p_mac;
 	struct bcm_cfg80211 *cfg = wiphy_priv(wiphy);
@@ -1866,6 +1959,7 @@ wl_cfg80211_change_virtual_iface(struct wiphy *wiphy, struct net_device *ndev,
 	enum nl80211_iftype type, u32 *flags,
 	struct vif_params *params)
 {
+	W2017T("enter");
 	s32 ap = 0;
 	s32 infra = 0;
 	s32 ibss = 0;
@@ -7334,9 +7428,11 @@ wl_cfg80211_bcn_bringup_ap(
 	s32 err = BCME_OK;
 
 	WL_DBG(("Enter dev_role: %d\n", dev_role));
+	W2017T("bringup_ap enter role=%u", dev_role);
 
 	/* Common code for SoftAP and P2P GO */
 	wldev_iovar_setint(dev, "mpc", 0);
+	W2017T("bringup_ap: mpc 0 done");
 
 	if (dev_role == NL80211_IFTYPE_P2P_GO) {
 		is_bssup = wl_cfgp2p_bss_isup(dev, bssidx);
@@ -7376,6 +7472,7 @@ wl_cfg80211_bcn_bringup_ap(
 			WL_ERR(("WLC_DOWN error %d\n", err));
 			goto exit;
 		}
+		W2017T("bringup_ap: wlc_down done");
 		err = wldev_ioctl(dev, WLC_SET_INFRA, &infra, sizeof(s32), true);
 		if (err < 0) {
 			WL_ERR(("SET INFRA error %d\n", err));
@@ -7385,15 +7482,18 @@ wl_cfg80211_bcn_bringup_ap(
 			WL_ERR(("wl apsta 0 error %d\n", err));
 			goto exit;
 		}
+		W2017T("bringup_ap: apsta 0 done");
 		if ((err = wldev_ioctl(dev, WLC_SET_AP, &ap, sizeof(s32), true)) < 0) {
 			WL_ERR(("setting AP mode failed %d \n", err));
 			goto exit;
 		}
+		W2017T("bringup_ap: set_ap(1) done");
 		pm = 0;
 		if ((err = wldev_ioctl(dev, WLC_SET_PM, &pm, sizeof(pm), true)) != 0) {
 			WL_ERR(("wl PM 0 returned error:%d\n", err));
 			goto exit;
 		}
+		W2017T("bringup_ap: pm 0 done");
 #ifdef DISABLE_11H_SOFTAP
 		err = wldev_ioctl(dev, WLC_SET_SPECT_MANAGMENT,
 			&spect, sizeof(s32), true);
@@ -7408,12 +7508,14 @@ wl_cfg80211_bcn_bringup_ap(
 			WL_ERR(("WLC_UP error (%d)\n", err));
 			goto exit;
 		}
+		W2017T("bringup_ap: wlc_up done");
 
 		err = wldev_iovar_getint(dev, "wsec", (s32 *)&wsec);
 		if (unlikely(err)) {
 			WL_ERR(("Could not get wsec %d\n", err));
 			goto exit;
 		}
+		W2017T("bringup_ap: wsec=%d", wsec);
 		if ((wsec == WEP_ENABLED) && cfg->wep_key.len) {
 			WL_DBG(("Applying buffered WEP KEY \n"));
 			err = wldev_iovar_setbuf_bsscfg(dev, "wsec_key", &cfg->wep_key,
@@ -7437,6 +7539,7 @@ wl_cfg80211_bcn_bringup_ap(
 		join_params.ssid.SSID_len = htod32(join_params.ssid.SSID_len);
 
 		/* create softap */
+		W2017T("bringup_ap: setting ssid");
 		if ((err = wldev_ioctl(dev, WLC_SET_SSID, &join_params,
 			join_params_size, true)) == 0) {
 			WL_DBG(("SoftAP set SSID (%s) success\n", join_params.ssid.SSID));
@@ -7449,6 +7552,7 @@ wl_cfg80211_bcn_bringup_ap(
 exit:
 	if (cfg->wep_key.len)
 		memset(&cfg->wep_key, 0, sizeof(struct wl_wsec_key));
+	W2017T("bringup_ap leave err=%d", err);
 	return err;
 }
 
@@ -7750,6 +7854,10 @@ wl_cfg80211_start_ap(
 	struct net_device *dev,
 	struct cfg80211_ap_settings *info)
 {
+	pr_info("W2017DBG: start_ap E\n");
+	W2017T("enter dev=%s", dev->name);
+	w2017_ap_active_jiffies = jiffies;
+	w2017_ap_up = 1;
 	struct bcm_cfg80211 *cfg = wiphy_priv(wiphy);
 	s32 err = BCME_OK;
 	struct parsed_ies ies;
@@ -7791,18 +7899,21 @@ wl_cfg80211_start_ap(
 		goto fail;
 	}
 #endif /* ((LINUX_VERSION >= VERSION(3, 6, 0) && !WL_COMPAT_WIRELESS) */
+	W2017T("channel set");
 
 	if ((err = wl_cfg80211_bcn_set_params(info, dev,
 		dev_role, bssidx)) < 0) {
 		WL_ERR(("Beacon params set failed \n"));
 		goto fail;
 	}
+	W2017T("beacon params set");
 
 	/* Parse IEs */
 	if ((err = wl_cfg80211_parse_ap_ies(dev, &info->beacon, &ies)) < 0) {
 		WL_ERR(("Set IEs failed \n"));
 		goto fail;
 	}
+	W2017T("ies parsed");
 
 	if ((wl_cfg80211_bcn_validate_sec(dev, &ies,
 		dev_role, bssidx)) < 0)
@@ -7810,12 +7921,14 @@ wl_cfg80211_start_ap(
 		WL_ERR(("Beacon set security failed \n"));
 		goto fail;
 	}
+	W2017T("sec validated");
 
 	if ((err = wl_cfg80211_bcn_bringup_ap(dev, &ies,
 		dev_role, bssidx)) < 0) {
 		WL_ERR(("Beacon bring up AP/GO failed \n"));
 		goto fail;
 	}
+	W2017T("ap brought up");
 
 	WL_DBG(("** AP/GO Created **\n"));
 
@@ -7845,6 +7958,7 @@ fail:
 		WL_ERR(("ADD/SET beacon failed\n"));
 		wldev_iovar_setint(dev, "mpc", 1);
 	}
+	W2017T("leave err=%d", err);
 
 	return err;
 }
@@ -7854,6 +7968,10 @@ wl_cfg80211_stop_ap(
 	struct wiphy *wiphy,
 	struct net_device *dev)
 {
+	pr_info("W2017DBG: stop_ap E\n");
+	W2017T("enter dev=%s", dev->name);
+	w2017_ap_active_jiffies = jiffies;
+	w2017_ap_up = 0;
 	int err = 0;
 	u32 dev_role = 0;
 	int infra = 0;
@@ -7894,12 +8012,14 @@ wl_cfg80211_stop_ap(
 			err = -ENOTSUPP;
 			goto exit;
 		}
+		W2017T("stop_ap: set_ap(0) done");
 		err = wldev_ioctl(dev, WLC_SET_INFRA, &infra, sizeof(s32), true);
 		if (err < 0) {
 			WL_ERR(("SET INFRA error %d\n", err));
 			err = -ENOTSUPP;
 			goto exit;
 		}
+		W2017T("stop_ap: set_infra done");
 
 		err = wldev_ioctl(dev, WLC_UP, &ap, sizeof(s32), true);
 		if (unlikely(err)) {
@@ -7907,6 +8027,7 @@ wl_cfg80211_stop_ap(
 			err = -EINVAL;
 			goto exit;
 		}
+		W2017T("stop_ap: wlc_up done");
 
 		wl_clr_drv_status(cfg, AP_CREATED, dev);
 		/* Turn on the MPC */
@@ -7926,6 +8047,7 @@ wl_cfg80211_stop_ap(
 	}
 
 exit:
+	W2017T("leave err=%d", err);
 	return err;
 }
 
@@ -12610,6 +12732,8 @@ s32 wl_cfg80211_attach(struct net_device *ndev, void *context)
 	struct device *dev;
 
 	WL_TRACE(("In\n"));
+	W2017T("attach ndev=%s", ndev ? ndev->name : "(null)");
+	w2017_heartbeat_start();
 	if (!ndev) {
 		WL_ERR(("ndev is invaild\n"));
 		return -ENODEV;

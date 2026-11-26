@@ -23,6 +23,8 @@
  * $Id: dhd_flowrings.c jaganlv $
  */
 
+extern void w2017_trace(const char *fmt, ...);
+#define W2017D(fmt, ...) w2017_trace("W2017T: %s: " fmt "\n", __func__, ##__VA_ARGS__)
 #include <typedefs.h>
 #include <bcmutils.h>
 #include <bcmendian.h>
@@ -567,6 +569,12 @@ dhd_flowid_update(dhd_pub_t *dhdp, uint8 ifindex, uint8 prio, void *pktbuf)
 	struct ether_header *eh = (struct ether_header *)pktdata;
 	uint16 flowid;
 
+	/* W2017: drop multicast/broadcast so that the mcast flowring (flow 41,
+	 * peer 33:00:16) is never created - the prime suspect for the freeze. */
+	extern int w2017_no_mcast_flow;
+	if (w2017_no_mcast_flow && (eh->ether_dhost[0] & 0x01))
+		return BCME_ERROR;
+
 	if (dhd_bus_is_txmode_push(dhdp->bus))
 		return BCME_OK;
 
@@ -650,6 +658,7 @@ dhd_flowid_free(dhd_pub_t *dhdp, uint8 ifindex, uint16 flowid)
 void
 dhd_flow_rings_delete(dhd_pub_t *dhdp, uint8 ifindex)
 {
+	W2017D("enter ifindex=%u", ifindex);
 	uint32 id;
 	flow_ring_table_t *flow_ring_table;
 

@@ -26,6 +26,8 @@
  *
  * $Id: dhd_msgbuf.c 637308 2016-05-12 07:21:25Z $
  */
+extern void w2017_trace(const char *fmt, ...);
+#define W2017D(fmt, ...) w2017_trace("W2017T: %s: " fmt "\n", __func__, ##__VA_ARGS__)
 #include <typedefs.h>
 #include <osl.h>
 
@@ -3166,12 +3168,43 @@ extern bool g_pm_control;
 #endif /* CUSTOMER_HW4 & CONFIG_CONTROL_PM */
 
 /* Use protocol to issue ioctl to dongle */
+extern void _w2017_note(int kind, const char *name, unsigned long pc);
+static char w2017_last_iovar[24];
+
+/* W2017: keep the firmware out of power save (PM2).  The framework asks for
+ * PM=2 on every wifi start; with an AP running that makes the dongle drop into
+ * its own power-save state and stop answering PCIe accesses. */
+int w2017_force_pm0;
+module_param_named(w2017_force_pm0, w2017_force_pm0, int, 0644);
+
 int dhd_prot_ioctl(dhd_pub_t *dhd, int ifidx, wl_ioctl_t * ioc, void * buf, int len)
 {
 	dhd_prot_t *prot = dhd->prot;
 	int ret = -1;
 	uint8 action;
 
+	_w2017_note(7, NULL, (unsigned long)__builtin_return_address(0));
+	{
+		int w2017_l, w2017_i;
+
+		w2017_last_iovar[0] = 0;
+		if (ioc && (ioc->cmd == WLC_SET_VAR || ioc->cmd == WLC_GET_VAR) &&
+		    ioc->buf && len > 0) {
+			w2017_l = len < 20 ? len : 20;
+			memcpy(w2017_last_iovar, ioc->buf, w2017_l);
+			w2017_last_iovar[w2017_l] = 0;
+			for (w2017_i = 0; w2017_i < w2017_l; w2017_i++) {
+				if (w2017_last_iovar[w2017_i] < 32 ||
+				    w2017_last_iovar[w2017_i] > 126) {
+					w2017_last_iovar[w2017_i] = 0;
+					break;
+				}
+			}
+		}
+		pr_err("W2017T: ioctl cmd=%d idx=%d len=%d set=%d nm=%s\n",
+			ioc ? ioc->cmd : -1, ifidx, len, ioc ? ioc->set : -1,
+			w2017_last_iovar);
+	}
 	if ((dhd->busstate == DHD_BUS_DOWN) || dhd->hang_was_sent) {
 		DHD_ERROR(("%s : bus is down. we have nothing to do\n", __FUNCTION__));
 		goto done;
@@ -3188,6 +3221,11 @@ int dhd_prot_ioctl(dhd_pub_t *dhd, int ifidx, wl_ioctl_t * ioc, void * buf, int 
 
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
 #ifdef CUSTOMER_HW4
+	if (ioc->cmd == WLC_SET_PM && w2017_force_pm0) {
+		pr_err("W2017T: force PM %d -> 0\n", buf ? *(char *)buf : -1);
+		if (buf)
+			*(char *)buf = 0;
+	}
 	if (ioc->cmd == WLC_SET_PM) {
 #ifdef CONFIG_CONTROL_PM
 		if (g_pm_control == TRUE) {
@@ -3265,6 +3303,8 @@ int dhd_prot_ioctl(dhd_pub_t *dhd, int ifidx, wl_ioctl_t * ioc, void * buf, int 
 	 */
 	mutex_unlock(&prot->ioctl_mutex);
 done:
+	pr_err("W2017T: ioctl ret cmd=%d ret=%d nm=%s\n",
+		ioc ? ioc->cmd : -1, ret, w2017_last_iovar);
 	return ret;
 
 }
@@ -4476,6 +4516,7 @@ prot_early_upd_rxcpln_read_idx(dhd_pub_t *dhd, msgbuf_ring_t * ring)
 int
 dhd_prot_flow_ring_create(dhd_pub_t *dhd, flow_ring_node_t *flow_ring_node)
 {
+	pr_info("W2017DBG: flow_ring_create E\n");
 	tx_flowring_create_request_t *flow_create_rqst;
 	msgbuf_ring_t *msgbuf_flow_info;
 	dhd_prot_t *prot = dhd->prot;
@@ -4619,6 +4660,7 @@ void dhd_prot_print_info(dhd_pub_t *dhd, struct bcmstrbuf *strbuf)
 int
 dhd_prot_flow_ring_delete(dhd_pub_t *dhd, flow_ring_node_t *flow_ring_node)
 {
+	W2017D("enter");
 	tx_flowring_delete_request_t *flow_delete_rqst;
 	dhd_prot_t *prot = dhd->prot;
 	uint16 msglen = sizeof(tx_flowring_delete_request_t);

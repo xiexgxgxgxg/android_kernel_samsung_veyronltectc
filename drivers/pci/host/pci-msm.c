@@ -713,8 +713,60 @@ static const struct msm_pcie_irq_info_t msm_pcie_msi_info[MSM_PCIE_MAX_MSI] = {
 	{"msi_28", 0}, {"msi_29", 0}, {"msi_30", 0}, {"msi_31", 0}
 };
 
+extern int sdlog_emit(const char *tag, const char *text, unsigned int len);
+
+static int w2017_rc_off;
+static char w2017_rc_buf[192];
+
+/* Durable trace: printk plus an immediate SD-card record when we are in
+ * process context, so the step survives a hard lockup.  Used only around the
+ * PCIe RC power sequencing (a few lines per power cycle). */
+static void w2017_rc_trace(const char *fmt, ...)
+{
+	va_list args;
+	int n;
+
+	va_start(args, fmt);
+	n = vsnprintf(w2017_rc_buf, sizeof(w2017_rc_buf), fmt, args);
+	va_end(args);
+	if (n <= 0)
+		return;
+	pr_err("W2017T: %s", w2017_rc_buf);
+	/* NOTE: no sdlog_emit here on purpose.  A synchronous SD write inside
+	 * msm_pcie_enable() stretched the boot-time RC bring-up from ~3.2 s to
+	 * ~4.2 s and made pci_register_driver() race with the enumeration
+	 * ("pcie_register_driver failed", no wlan0).  Keep it printk only; the
+	 * sdlog periodic flush (1 s) still catches these lines. */
+}
+
+/* W2017 experiment: force the RC/EP link out of L0s/L1/L1SS (ASPM).  The
+ * frozen logs show the SoC dying ~4 s after the soft AP comes up with no host
+ * PCIe access at all in the window, i.e. right about when an idle link would
+ * drop into L1 - if the endpoint's L1 state machine is broken after a dongle
+ * power cycle that stalls the interconnect. */
+int w2017_pcie_no_l1;
+module_param_named(w2017_pcie_no_l1, w2017_pcie_no_l1, int, 0644);
+
+/* W2017: RC interrupt accounting.  A PCIe level error (AER) or a wake/linkdown
+ * event right before the freeze would say the endpoint is misbehaving on the
+ * link; the counts are printed once a second by the wl_cfg80211 heartbeat. */
+unsigned int w2017_n_msi, w2017_n_aer, w2017_n_ld, w2017_n_wake;
+unsigned int w2017_aer_unc, w2017_aer_cor, w2017_aer_rc, w2017_aer_n;
+
+/* W2017 experiment: msm_pcie_disable() asserts PERST and kills the clocks
+ * without caring whether the RC's AXI master still has transactions in
+ * flight.  An EP DMA write left outstanding there is exactly the kind of
+ * thing whose incomplete AXI transaction wedges the interconnect a few
+ * seconds later (which is what the frozen logs look like: silence, then the
+ * next peripheral access hangs).  Set this to N > 0 to halt the AXI master
+ * and drain for N ms before asserting PERST. */
+int w2017_pcie_drain_ms = 0;
+module_param_named(w2017_pcie_drain_ms, w2017_pcie_drain_ms, int, 0644);
+
 static inline void msm_pcie_write_reg(void *base, u32 offset, u32 value)
 {
+	if (w2017_rc_off)
+		w2017_rc_trace("RC ACCESS while off: write off=0x%x\n", offset);
 	writel_relaxed(value, base + offset);
 	wmb();
 }
@@ -723,7 +775,11 @@ static inline void msm_pcie_write_reg_field(void *base, u32 offset,
 	const u32 mask, u32 val)
 {
 	u32 shift = find_first_bit((void *)&mask, 32);
-	u32 tmp = readl_relaxed(base + offset);
+	u32 tmp;
+
+	if (w2017_rc_off)
+		w2017_rc_trace("RC ACCESS while off: write_field off=0x%x\n", offset);
+	tmp = readl_relaxed(base + offset);
 
 	tmp &= ~mask; /* clear written bits */
 	val = tmp | (val << shift);
@@ -3913,6 +3969,16 @@ int msm_pcie_enable(struct msm_pcie_dev_t *dev, u32 options)
 	long int retries = 0;
 	int link_check_count = 0;
 
+	w2017_rc_off = 0;
+	if (w2017_pcie_no_l1) {
+		dev->l0s_supported = false;
+		dev->l1_supported = false;
+		dev->l1ss_supported = false;
+		w2017_rc_trace("enable rc%d: ASPM (L0s/L1/L1SS) forced off\n",
+			dev->rc_idx);
+	}
+	w2017_rc_trace("enable rc%d: entry status=%d options=0x%x\n",
+		dev->rc_idx, dev->link_status, options);
 	PCIE_DBG(dev, "RC%d: entry\n", dev->rc_idx);
 
 	mutex_lock(&dev->setup_lock);
@@ -3953,6 +4019,7 @@ int msm_pcie_enable(struct msm_pcie_dev_t *dev, u32 options)
 		msm_pcie_restore_sec_config(dev);
 	}
 
+	w2017_rc_trace("enable rc%d: clocks on, parf ctrl\n", dev->rc_idx);
 	/* enable PCIe clocks and resets */
 	msm_pcie_write_mask(dev->parf + PCIE20_PARF_PHY_CTRL, BIT(0), 0);
 
@@ -3980,6 +4047,8 @@ int msm_pcie_enable(struct msm_pcie_dev_t *dev, u32 options)
 			PCIE20_PARF_AXI_MSTR_WR_ADDR_HALT, 0, BIT(31));
 	}
 
+	w2017_rc_trace("enable rc%d: phy init enter (num_rc_on=%d)\n",
+		dev->rc_idx, num_rc_on);
 	mutex_lock(&com_phy_lock);
 	/* init PCIe PHY */
 	if (!num_rc_on)
@@ -4031,6 +4100,7 @@ int msm_pcie_enable(struct msm_pcie_dev_t *dev, u32 options)
 	if (dev->ep_latency)
 		usleep_range(dev->ep_latency * 1000, dev->ep_latency * 1000);
 
+	w2017_rc_trace("enable rc%d: phy ready, releasing PERST\n", dev->rc_idx);
 	if (dev->gpio[MSM_PCIE_GPIO_EP].num)
 		gpio_set_value(dev->gpio[MSM_PCIE_GPIO_EP].num,
 				dev->gpio[MSM_PCIE_GPIO_EP].on);
@@ -4048,6 +4118,7 @@ int msm_pcie_enable(struct msm_pcie_dev_t *dev, u32 options)
 	msm_pcie_write_reg_field(dev->dm_core, PCIE20_DEVICE_CONTROL_STATUS,
 				0x7000, dev->tlp_rd_size);
 
+	w2017_rc_trace("enable rc%d: link training start\n", dev->rc_idx);
 	/* enable link training */
 	msm_pcie_write_mask(dev->parf + PCIE20_PARF_LTSSM, 0, BIT(8));
 
@@ -4081,6 +4152,7 @@ int msm_pcie_enable(struct msm_pcie_dev_t *dev, u32 options)
 		goto link_fail;
 	}
 
+	w2017_rc_trace("enable rc%d: link up, config controller\n", dev->rc_idx);
 	msm_pcie_config_controller(dev);
 
 	if (!dev->msi_gicm_addr)
@@ -4092,6 +4164,7 @@ int msm_pcie_enable(struct msm_pcie_dev_t *dev, u32 options)
 	dev->power_on = true;
 	dev->suspending = false;
 	dev->link_turned_on_counter++;
+	w2017_rc_trace("enable rc%d: DONE\n", dev->rc_idx);
 
 	goto out;
 
@@ -4144,6 +4217,18 @@ void msm_pcie_disable(struct msm_pcie_dev_t *dev, u32 options)
 	dev->power_on = false;
 	dev->link_turned_off_counter++;
 
+	if (w2017_pcie_drain_ms > 0) {
+		/* halt the RC's AXI master, then give the outstanding
+		 * transactions time to retire before PERST kills the link */
+		msm_pcie_write_mask(dev->parf +
+			PCIE20_PARF_AXI_MSTR_WR_ADDR_HALT, 0, BIT(31));
+		w2017_rc_trace("disable rc%d: AXI WR halted, draining %d ms\n",
+			dev->rc_idx, w2017_pcie_drain_ms);
+		msleep(w2017_pcie_drain_ms);
+		w2017_rc_trace("disable rc%d: drain done, asserting PERST\n",
+			dev->rc_idx);
+	}
+
 	PCIE_INFO(dev, "PCIe: Assert the reset of endpoint of RC%d.\n",
 		dev->rc_idx);
 
@@ -4182,6 +4267,9 @@ void msm_pcie_disable(struct msm_pcie_dev_t *dev, u32 options)
 				1 - dev->gpio[MSM_PCIE_GPIO_EP].on);
 
 	mutex_unlock(&dev->setup_lock);
+
+	w2017_rc_off = 1;
+	w2017_rc_trace("disable rc%d: DONE, rc_off=1\n", dev->rc_idx);
 
 	PCIE_DBG(dev, "RC%d: exit\n", dev->rc_idx);
 }
@@ -4681,6 +4769,15 @@ static irqreturn_t handle_aer_irq(int irq, void *data)
 				PCIE20_AER_ROOT_ERR_STATUS_REG);
 	rc_dev_ctrlstts = readl_relaxed(dev->dm_core +
 				PCIE20_CAP_DEVCTRLSTATUS);
+	w2017_n_aer++;
+	w2017_aer_unc = uncorr_val;
+	w2017_aer_cor = corr_val;
+	w2017_aer_rc = rc_err_status;
+	w2017_aer_n++;
+	if (w2017_n_aer <= 20 || (w2017_n_aer % 200) == 0)
+		pr_err("W2017T: AER irq #%u rc%d unc=0x%x cor=0x%x root=0x%x devctl=0x%x\n",
+			w2017_n_aer, dev->rc_idx, uncorr_val, corr_val,
+			rc_err_status, rc_dev_ctrlstts);
 
 	if (uncorr_val)
 		PCIE_DBG(dev, "RC's PCIE20_AER_UNCORR_ERR_STATUS_REG:0x%x\n",
@@ -4799,6 +4896,7 @@ static irqreturn_t handle_wake_irq(int irq, void *data)
 	spin_lock_irqsave(&dev->wakeup_lock, irqsave_flags);
 
 	dev->wake_counter++;
+	w2017_n_wake++;
 	PCIE_DBG(dev, "PCIe: No. %ld wake IRQ for RC%d\n",
 			dev->wake_counter, dev->rc_idx);
 
@@ -4835,6 +4933,9 @@ static irqreturn_t handle_wake_irq(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+static int w2017_linkdown_dump;	/* 0: skip the PHY/PARF dumps */
+module_param_named(w2017_linkdown_dump, w2017_linkdown_dump, int, 0644);
+
 static irqreturn_t handle_linkdown_irq(int irq, void *data)
 {
 	struct msm_pcie_dev_t *dev = data;
@@ -4844,10 +4945,11 @@ static irqreturn_t handle_linkdown_irq(int irq, void *data)
 	spin_lock_irqsave(&dev->linkdown_lock, irqsave_flags);
 
 	dev->linkdown_counter++;
+	w2017_n_ld++;
 
-	PCIE_DBG(dev,
-		"PCIe: No. %ld linkdown IRQ for RC%d.\n",
-		dev->linkdown_counter, dev->rc_idx);
+	pr_err("W2017T: linkdown irq rc%d counter=%lu status=%d suspending=%d\n",
+		dev->rc_idx, dev->linkdown_counter, dev->link_status,
+		dev->suspending ? 1 : 0);
 
 	if (!dev->enumerated || dev->link_status != MSM_PCIE_LINK_ENABLED) {
 		PCIE_DBG(dev,
@@ -4861,8 +4963,16 @@ static irqreturn_t handle_linkdown_irq(int irq, void *data)
 		dev->link_status = MSM_PCIE_LINK_DISABLED;
 		dev->shadow_en = false;
 
-		pcie_phy_dump(dev);
-		pcie_parf_dump(dev);
+		/* W2017: the PHY/PARF register dumps below run in hard IRQ
+		 * context right after the endpoint lost power and are a
+		 * candidate for the whole-SoC hang; keep them behind a flag
+		 * so they can be turned off while chasing the freeze. */
+		if (w2017_linkdown_dump) {
+			pcie_phy_dump(dev);
+			pcie_parf_dump(dev);
+		}
+		pr_err("W2017T: linkdown: dumps done (skipped=%d)\n",
+			w2017_linkdown_dump ? 0 : 1);
 
 		/* assert PERST */
 		gpio_set_value(dev->gpio[MSM_PCIE_GPIO_PERST].num,
@@ -4877,7 +4987,9 @@ static irqreturn_t handle_linkdown_irq(int irq, void *data)
 					MSM_PCIE_EVENT_LINKDOWN);
 			}
 		} else {
+			pr_err("W2017T: linkdown: notify client enter\n");
 			msm_pcie_notify_client(dev, MSM_PCIE_EVENT_LINKDOWN);
+			pr_err("W2017T: linkdown: notify client done\n");
 		}
 	}
 
@@ -4893,6 +5005,7 @@ static irqreturn_t handle_msi_irq(int irq, void *data)
 	struct msm_pcie_dev_t *dev = data;
 	void __iomem *ctrl_status;
 
+	w2017_n_msi++;
 	PCIE_DBG(dev, "irq=%d\n", irq);
 
 	/* check for set bits, clear it by setting that bit

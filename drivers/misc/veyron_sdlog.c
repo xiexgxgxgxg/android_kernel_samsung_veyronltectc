@@ -329,7 +329,7 @@ static void sdlog_load_state(struct mmc_card *card)
 
 static void sdlog_flush(void)
 {
-	struct mmc_card *card = sdlog_card();
+	struct mmc_card *card = NULL;
 	struct sdlog_rec_hdr hdr;
 	struct mmc_host *host;
 	size_t off;
@@ -337,6 +337,9 @@ static void sdlog_flush(void)
 	unsigned int blocks;
 	int err = 0;
 
+	if (!sdlog_enable)
+		return;
+	card = sdlog_card();
 	if (!card) {
 		if (sdlog_attempts < 5)
 			pr_info("sdlog: no SD card on the mmc bus yet (%u)\n",
@@ -575,8 +578,10 @@ static void sdlog_capture(struct kmsg_dumper *dumper,
 
 static void sdlog_workfn(struct work_struct *w)
 {
-	strncpy(sdlog_tag, "periodic", SDLOG_TAG_LEN);
-	sdlog_flush();
+	if (sdlog_enable) {
+		strncpy(sdlog_tag, "periodic", SDLOG_TAG_LEN);
+		sdlog_flush();
+	}
 	schedule_delayed_work(&sdlog_dwork,
 			      msecs_to_jiffies(sdlog_period_ms));
 }

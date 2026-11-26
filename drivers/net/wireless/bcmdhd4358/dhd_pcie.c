@@ -26,6 +26,83 @@
 
 
 /* include files */
+extern void w2017_trace(const char *fmt, ...);
+#define W2017D(fmt, ...) w2017_trace("W2017T: %s: " fmt "\n", __func__, ##__VA_ARGS__)
+extern void w2017_trace_sync(const char *fmt, ...);
+#define W2017S(fmt, ...) w2017_trace_sync("W2017T: %s: " fmt "\n", __func__, ##__VA_ARGS__)
+
+/* W2017: PCIe access recorder.
+ * The frozen logs stop ~4.2 s after the soft AP comes up without a single
+ * driver trace, so the open question is whether anything still touches the
+ * chip in that window and from where.  Every low level access bumps a
+ * counter and stores (jiffies, caller PC, kind); dhd_bus_watchdog prints one
+ * summary line twice a second, which the sdlog keeps. */
+unsigned long w2017_act_jiffies;
+unsigned long w2017_act_pc;
+int w2017_act_kind;
+char w2017_act_name[28];
+unsigned int w2017_n_cfg_r, w2017_n_cfg_w, w2017_n_cmn, w2017_n_bell,
+	w2017_n_isr, w2017_n_ioctl, w2017_n_dpc;
+
+void _w2017_note(int kind, const char *name, unsigned long pc)
+{
+	w2017_act_jiffies = jiffies;
+	w2017_act_pc = pc;
+	w2017_act_kind = kind;
+	if (name) {
+		strncpy(w2017_act_name, name, sizeof(w2017_act_name) - 1);
+		w2017_act_name[sizeof(w2017_act_name) - 1] = 0;
+	} else
+		w2017_act_name[0] = 0;
+	switch (kind) {
+	case 1: w2017_n_cfg_r++; break;
+	case 2: w2017_n_cfg_w++; break;
+	case 3: w2017_n_cmn++; break;
+	case 5: w2017_n_bell++; break;
+	case 6: w2017_n_isr++; break;
+	case 7: w2017_n_ioctl++; break;
+	case 8: w2017_n_dpc++; break;
+	}
+}
+#define W2017_NOTE(kind, nm) \
+	_w2017_note((kind), (nm), (unsigned long)__builtin_return_address(0))
+
+
+/* W2017 experiment: after the dongle firmware has been (re)downloaded, wait
+ * this many ms before letting the stack touch it.  The frozen logs show
+ * hostapd's start_ap landing ~110 ms after "WLAN Power On Done" and the box
+ * dying ~4.5 s later, so give the dongle time to settle.  0 = off. */
+extern int w2017_force_apsta;	/* wl_android.c: apsta firmware policy */
+extern unsigned long w2017_ap_active_jiffies;
+extern int w2017_ap_up;
+/* set for the duration of one preinit: the loaded firmware is the AP one */
+int w2017_last_fw_ap;
+extern int w2017_last_fw_ap;
+
+int w2017_settle_ms = 0;
+module_param_named(w2017_settle_ms, w2017_settle_ms, int, 0644);
+
+/* W2017 experiment: 1 = the DPC does not touch the chip at all.  Between the
+ * AP start and the freeze the host only ever issues PCIe transactions from the
+ * DPC (mailbox/TCM/doorbell); if neutering it stops the freeze, the hang is in
+ * there. */
+int w2017_dpc_noop = 0;
+module_param_named(w2017_dpc_noop, w2017_dpc_noop, int, 0644);
+
+/* W2017: bisect the DPC.  Bit mask, 0 = run everything:
+ *   0x01 skip dhdpcie_handle_mb_data
+ *   0x02 skip dhdpcip_bus_read_frames (all frame/completion processing)
+ *   0x04 skip the final interrupt re-enable (config write)
+ *   0x10 skip dhd_prot_process_ctrlbuf
+ *   0x20 skip dhd_update_txflowrings
+ *   0x40 skip dhd_prot_process_msgbuf_txcpl
+ *   0x80 skip dhd_prot_process_msgbuf_rxcpl
+ */
+int w2017_dpc_skip = 0;
+module_param_named(w2017_dpc_skip, w2017_dpc_skip, int, 0644);
+#define W2017_SUSPECT(bus) ((bus)->dhd->busstate != DHD_BUS_DATA || (bus)->is_linkdown)
+int w2017_chip_off;	/* 1: WL_REG_ON is low, chip unpowered */
+EXPORT_SYMBOL(w2017_chip_off);
 #include <typedefs.h>
 #include <bcmutils.h>
 #include <bcmdevs.h>
@@ -397,6 +474,7 @@ disable interrupt and queue DPC if mail box interrupts are raised.
 int32
 dhdpcie_bus_isr(dhd_bus_t *bus)
 {
+	W2017_NOTE(6, NULL);
 
 	do {
 			DHD_TRACE(("%s: Enter\n", __FUNCTION__));
@@ -751,7 +829,18 @@ dhdpcie_bus_release_dongle(dhd_bus_t *bus, osl_t *osh, bool dongle_isolation, bo
 uint32
 dhdpcie_bus_cfg_read_dword(dhd_bus_t *bus, uint32 addr, uint32 size)
 {
-	uint32 data = OSL_PCI_READ_CONFIG(bus->osh, addr, size);
+	uint32 data;
+
+	if (w2017_chip_off) {
+		W2017D("cfg_read SKIPPED (chip off) addr=0x%x", addr);
+		return 0xffffffff;
+	}
+	W2017_NOTE(1, NULL);
+	if (W2017_SUSPECT(bus))
+		W2017D("cfg_read addr=0x%x size=%u busstate=%d linkdown=%d d3hot=%d",
+			addr, size, bus->dhd->busstate, bus->is_linkdown,
+			bus->pci_d3hot_done);
+	data = OSL_PCI_READ_CONFIG(bus->osh, addr, size);
 	return data;
 }
 
@@ -759,6 +848,7 @@ dhdpcie_bus_cfg_read_dword(dhd_bus_t *bus, uint32 addr, uint32 size)
 void
 dhdpcie_bus_cfg_write_dword(dhd_bus_t *bus, uint32 addr, uint32 size, uint32 data)
 {
+	W2017_NOTE(2, NULL);
 	OSL_PCI_WRITE_CONFIG(bus->osh, addr, size, data);
 }
 
@@ -835,6 +925,22 @@ done:
 /* Watchdog timer function */
 bool dhd_bus_watchdog(dhd_pub_t *dhd)
 {
+	{
+		static unsigned int wd_cnt;
+		static unsigned long last_sum;
+		if ((wd_cnt++ % 10) == 0)
+			W2017D("watchdog #%u busstate=%u", wd_cnt, dhd->busstate);
+		if (time_after(jiffies, last_sum + HZ / 2)) {
+			last_sum = jiffies;
+			W2017S("act: cfg_r=%u cfg_w=%u cmn=%u bell=%u isr=%u ioctl=%u dpc=%u "
+				"last(k=%d pc=%lx ago=%ums nm=%s) busstate=%d",
+				w2017_n_cfg_r, w2017_n_cfg_w, w2017_n_cmn,
+				w2017_n_bell, w2017_n_isr, w2017_n_ioctl, w2017_n_dpc,
+				w2017_act_kind, w2017_act_pc,
+				jiffies_to_msecs(jiffies - w2017_act_jiffies),
+				w2017_act_name, dhd->busstate);
+		}
+	}
 #ifdef DHD_DEBUG
 	dhd_bus_t *bus;
 	bus = dhd->bus;
@@ -1051,6 +1157,32 @@ dhd_bus_download_firmware(struct dhd_bus *bus, osl_t *osh,
 
 	bus->fw_path = pfw_path;
 	bus->nv_path = pnv_path;
+
+	/* W2017: the stock ROM loads bcmdhd_apsta.bin whenever the soft AP is
+	 * brought up (verified from the stock kernel log) and bcmdhd_sta.bin for
+	 * station mode.  The Android 11 HAL never changes the path, so the AP
+	 * always ran on the station firmware here.  w2017_force_apsta:
+	 *   0 = off, 1 = always apsta, 2 = auto (apsta for AP sessions) */
+	w2017_last_fw_ap = FALSE;
+	if (bus->fw_path && (w2017_force_apsta == 1 ||
+	    (w2017_force_apsta == 2 &&
+	     (w2017_ap_up || (w2017_ap_active_jiffies &&
+	      time_before(jiffies, w2017_ap_active_jiffies + 60 * HZ)))))) {
+		char *sp = strstr(bus->fw_path, "bcmdhd_sta.bin");
+		if (sp) {
+			static char w2017_fwbuf[256];
+			int pre = (int)(sp - bus->fw_path);
+			if (pre > 200)
+				pre = 200;
+			memcpy(w2017_fwbuf, bus->fw_path, pre);
+			strcpy(w2017_fwbuf + pre, "bcmdhd_apsta.bin");
+			strcat(w2017_fwbuf, sp + strlen("bcmdhd_sta.bin"));
+			W2017S("fwpath forced: %s -> %s", bus->fw_path,
+				w2017_fwbuf);
+			bus->fw_path = w2017_fwbuf;
+			w2017_last_fw_ap = TRUE;
+		}
+	}
 
 	ret = dhdpcie_download_firmware(bus, osh);
 
@@ -2229,6 +2361,11 @@ dhdpcie_bus_rtcm64(dhd_bus_t *bus, ulong offset)
 void
 dhd_bus_cmn_writeshared(dhd_bus_t *bus, void * data, uint32 len, uint8 type, uint16 ringid)
 {
+	W2017_NOTE(4, NULL);
+	if (w2017_chip_off) {
+		W2017D("SKIPPED (chip off)");
+		return;
+	}
 	uint64 long_data;
 	ulong tcm_offset;
 	pciedev_shared_t *sh;
@@ -2348,6 +2485,11 @@ dhd_bus_cmn_writeshared(dhd_bus_t *bus, void * data, uint32 len, uint8 type, uin
 void
 dhd_bus_cmn_readshared(dhd_bus_t *bus, void* data, uint8 type, uint16 ringid)
 {
+	W2017_NOTE(3, NULL);
+	if (w2017_chip_off) {
+		W2017D("SKIPPED (chip off)");
+		return;
+	}
 	pciedev_shared_t *sh;
 	ulong tcm_offset;
 
@@ -2792,6 +2934,7 @@ pcie2_mdioop(dhd_bus_t *bus, uint physmedia, uint regaddr, bool write, uint *val
 int
 dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 {
+	pr_info("W2017DBG: bus_devreset E\n");
 	dhd_bus_t *bus = dhdp->bus;
 	int bcmerror = 0;
 #ifdef CONFIG_ARCH_MSM
@@ -2804,29 +2947,38 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 		if (flag == TRUE) { /* Turn off WLAN */
 			/* Removing Power */
 			DHD_ERROR(("%s: == Power OFF ==\n", __FUNCTION__));
+			W2017S("devreset off: enter busstate=%d intr=%d",
+				bus->dhd->busstate, bus->intr ? 1 : 0);
 			bus->dhd->up = FALSE;
 			if (bus->dhd->busstate != DHD_BUS_DOWN) {
 				if (bus->intr) {
 					dhdpcie_bus_intr_disable(bus);
 					dhdpcie_free_irq(bus);
 				}
+				W2017S("devreset off: irq disabled");
 #ifdef BCMPCIE_OOB_HOST_WAKE
 				/* Clean up any pending host wake IRQ */
 				dhd_bus_oob_intr_set(bus->dhd, FALSE);
 				dhd_bus_oob_intr_unregister(bus->dhd);
 #endif /* BCMPCIE_OOB_HOST_WAKE */
 				dhd_os_wd_timer(dhdp, 0);
+				W2017S("devreset off: wd timer stopped");
 				dhd_bus_stop(bus, TRUE);
+				W2017S("devreset off: dhd_bus_stop done");
 				dhd_prot_clear(dhdp);
 				dhd_clear(dhdp);
+				W2017S("devreset off: prot/clear done");
 				dhd_bus_release_dongle(bus);
+				W2017S("devreset off: release_dongle done");
 				dhdpcie_bus_free_resource(bus);
+				W2017S("devreset off: free_resource done");
 				bcmerror = dhdpcie_bus_disable_device(bus);
 				if (bcmerror) {
 					DHD_ERROR(("%s: dhdpcie_bus_disable_device: %d\n",
 						__FUNCTION__, bcmerror));
 					goto done;
 				}
+				W2017S("devreset off: disable_device done");
 #ifdef CONFIG_ARCH_MSM
 				bcmerror = dhdpcie_bus_clock_stop(bus);
 				if (bcmerror) {
@@ -2834,8 +2986,10 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 						__FUNCTION__, bcmerror));
 					goto done;
 				}
+				W2017S("devreset off: clock_stop done");
 #endif /* CONFIG_ARCH_MSM */
 				bus->dhd->busstate = DHD_BUS_DOWN;
+				W2017S("devreset off: busstate DOWN");
 			} else {
 				if (bus->intr) {
 					dhdpcie_free_irq(bus);
@@ -2928,6 +3082,12 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 					DHD_ERROR(("%s: dhd_bus_start: %d\n",
 						__FUNCTION__, bcmerror));
 					goto done;
+				}
+				if (w2017_settle_ms > 0) {
+					W2017S("settle: sleeping %d ms after firmware download",
+						w2017_settle_ms);
+					msleep(w2017_settle_ms);
+					W2017S("settle: done");
 				}
 
 				bus->dhd->up = TRUE;
@@ -4164,6 +4324,11 @@ dhd_bus_gen_devmb_intr(struct dhd_bus *bus)
 void
 dhd_bus_ringbell(struct dhd_bus *bus, uint32 value)
 {
+	W2017_NOTE(5, NULL);
+	if (w2017_chip_off) {
+		W2017D("SKIPPED (chip off)");
+		return;
+	}
 	if ((bus->sih->buscorerev == 2) || (bus->sih->buscorerev == 6) ||
 		(bus->sih->buscorerev == 4)) {
 		si_corereg(bus->sih, bus->sih->buscoreidx, PCIMailBoxInt, PCIE_INTB, PCIE_INTB);
@@ -4213,6 +4378,12 @@ dhd_bus_get_mbintr_fn(struct dhd_bus *bus)
 bool BCMFASTPATH
 dhd_bus_dpc(struct dhd_bus *bus)
 {
+	if (w2017_dpc_noop)
+		return FALSE;
+	W2017_NOTE(8, NULL);
+	W2017D("dpc enter intstatus=0x%x busstate=%d linkdown=%d d3hot=%d",
+		bus->intstatus, bus->dhd->busstate, bus->is_linkdown,
+		bus->pci_d3hot_done);
 	uint32 intstatus = 0;
 	uint32 newstatus = 0;
 	bool resched = FALSE;	  /* Flag indicating resched wanted */
@@ -4230,6 +4401,37 @@ dhd_bus_dpc(struct dhd_bus *bus)
 	if ((bus->sih->buscorerev == 6) || (bus->sih->buscorerev == 4) ||
 		(bus->sih->buscorerev == 2)) {
 		newstatus =  dhdpcie_bus_cfg_read_dword(bus, PCIIntstatus, 4);
+		{
+			/* W2017: a storm detector.  After a WLAN power cycle the
+			 * DPC can be re-entered ~1000 times/s, each time reading
+			 * and writing PCIIntstatus over PCIe.  Log the state now
+			 * and then so the sdlog shows what drives it. */
+			static unsigned long storm_j;
+			static unsigned long storm_cnt;
+
+			if (time_before(jiffies, storm_j + HZ)) {
+				storm_cnt++;
+				if (storm_cnt > 300 && (storm_cnt % 300) == 0)
+					W2017D("dpc storm cnt=%lu newstatus=0x%x intstatus=0x%x busstate=%d",
+						storm_cnt, newstatus, intstatus,
+						bus->dhd->busstate);
+			} else {
+				storm_j = jiffies;
+				storm_cnt = 0;
+			}
+		}
+		if (newstatus == 0xffffffff) {
+			/* Endpoint not answering (it is still coming out of reset
+			 * after a power cycle).  Treating all-ones as an interrupt
+			 * status keeps the DPC rescheduling forever and hammers
+			 * PCIe config space until the interconnect wedges. */
+			W2017D("dpc: PCIIntstatus all-FFs -> no irq (busstate=%d linkdown=%d)",
+				bus->dhd->busstate, bus->is_linkdown);
+			bus->intstatus = 0;
+			if (!bus->pci_d3hot_done)
+				dhdpcie_bus_intr_enable(bus);
+			return FALSE;
+		}
 		dhdpcie_bus_cfg_write_dword(bus, PCIIntstatus, 4, newstatus);
 		/* Merge new bits with previous */
 		intstatus |= newstatus;
@@ -4249,7 +4451,7 @@ dhd_bus_dpc(struct dhd_bus *bus)
 	}
 
 	if (!resched) {
-		if (!bus->pci_d3hot_done) {
+		if (!bus->pci_d3hot_done && !(w2017_dpc_skip & 0x04)) {
 			dhdpcie_bus_intr_enable(bus);
 		} else {
 			DHD_ERROR(("%s: dhdpcie_bus_intr_enable skip in pci D3hot state \n",
@@ -4329,6 +4531,7 @@ dhdpcie_handle_mb_data(dhd_bus_t *bus)
 #endif /* DHD_USE_IDLECOUNT */
 
 	dhd_bus_cmn_readshared(bus, &d2h_mb_data, DTOH_MB_DATA, 0);
+	W2017S("d2h mb data=0x%x busstate=%d", d2h_mb_data, bus->dhd->busstate);
 	if (D2H_DEV_MB_INVALIDATED(d2h_mb_data)) {
 		DHD_INFO_HW4(("%s: Invalid D2H_MB_DATA: 0x%08x\n",
 			__FUNCTION__, d2h_mb_data));
@@ -4369,6 +4572,18 @@ static bool
 dhdpcie_bus_process_mailbox_intr(dhd_bus_t *bus, uint32 intstatus)
 {
 	bool resched = FALSE;
+	{
+		/* W2017: the only host<->dongle traffic left in the window before
+		 * the freeze is the mailbox interrupt; log what it says. */
+		static unsigned long mb_j, mb_n;
+		if (time_after(jiffies, mb_j + HZ / 2)) {
+			mb_j = jiffies;
+			mb_n = 0;
+		}
+		if (mb_n++ < 8)
+			W2017S("mb intr intstatus=0x%x busstate=%d",
+				intstatus, bus->dhd->busstate);
+	}
 
 	if ((bus->sih->buscorerev == 2) || (bus->sih->buscorerev == 6) ||
 		(bus->sih->buscorerev == 4)) {
@@ -4380,7 +4595,8 @@ dhdpcie_bus_process_mailbox_intr(dhd_bus_t *bus, uint32 intstatus)
 		}
 	}
 	else {
-		if (intstatus & (PCIE_MB_TOPCIE_FN0_0 | PCIE_MB_TOPCIE_FN0_1))
+		if ((intstatus & (PCIE_MB_TOPCIE_FN0_0 | PCIE_MB_TOPCIE_FN0_1)) &&
+		    !(w2017_dpc_skip & 0x01))
 			dhdpcie_handle_mb_data(bus);
 
 		if (bus->dhd->busstate == DHD_BUS_SUSPEND) {
@@ -4388,7 +4604,8 @@ dhdpcie_bus_process_mailbox_intr(dhd_bus_t *bus, uint32 intstatus)
 		}
 
 		if (intstatus & PCIE_MB_D2H_MB_MASK) {
-			resched = dhdpci_bus_read_frames(bus);
+			if (!(w2017_dpc_skip & 0x02))
+				resched = dhdpci_bus_read_frames(bus);
 		}
 	}
 exit:
@@ -4406,23 +4623,27 @@ dhdpci_bus_read_frames(dhd_bus_t *bus)
 #endif /* DHD_USE_IDLECOUNT */
 	/* There may be frames in both ctrl buf and data buf; check ctrl buf first */
 	DHD_PERIM_LOCK(bus->dhd); /* Take the perimeter lock */
-	dhd_prot_process_ctrlbuf(bus->dhd);
+	if (!(w2017_dpc_skip & 0x10))
+		dhd_prot_process_ctrlbuf(bus->dhd);
 	/* Unlock to give chance for resp to be handled */
 	DHD_PERIM_UNLOCK(bus->dhd); /* Release the perimeter lock */
 
 	DHD_PERIM_LOCK(bus->dhd); /* Take the perimeter lock */
 	/* update the flow ring cpls */
-	dhd_update_txflowrings(bus->dhd);
+	if (!(w2017_dpc_skip & 0x20))
+		dhd_update_txflowrings(bus->dhd);
 
 	/* With heavy TX traffic, we could get a lot of TxStatus
 	 * so add bound
 	 */
-	more |= dhd_prot_process_msgbuf_txcpl(bus->dhd, dhd_txbound);
+	if (!(w2017_dpc_skip & 0x40))
+		more |= dhd_prot_process_msgbuf_txcpl(bus->dhd, dhd_txbound);
 
 	/* With heavy RX traffic, this routine potentially could spend some time
 	 * processing RX frames without RX bound
 	 */
-	more |= dhd_prot_process_msgbuf_rxcpl(bus->dhd, dhd_rxbound);
+	if (!(w2017_dpc_skip & 0x80))
+		more |= dhd_prot_process_msgbuf_rxcpl(bus->dhd, dhd_rxbound);
 
 	/* don't talk to the dongle if fw is about to be reloaded */
 	if (bus->dhd->hang_was_sent) {
@@ -4965,6 +5186,7 @@ dhd_bus_is_txmode_push(dhd_bus_t *bus)
 
 void dhd_bus_clean_flow_ring(dhd_bus_t *bus, void *node)
 {
+	W2017D("enter");
 	void *pkt;
 	flow_queue_t *queue;
 	flow_ring_node_t *flow_ring_node = (flow_ring_node_t *)node;
@@ -5092,6 +5314,7 @@ dhd_bus_flow_ring_delete_request(dhd_bus_t *bus, void *arg)
 void
 dhd_bus_flow_ring_delete_response(dhd_bus_t *bus, uint16 flowid, uint32 status)
 {
+	W2017D("enter flowid=%u status=%d", flowid, status);
 	flow_ring_node_t *flow_ring_node;
 
 	DHD_INFO(("%s :Flow Delete Response %d \n", __FUNCTION__, flowid));

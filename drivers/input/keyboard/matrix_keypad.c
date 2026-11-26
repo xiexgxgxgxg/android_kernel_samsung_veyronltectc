@@ -119,6 +119,10 @@ static void disable_row_irqs(struct matrix_keypad *keypad)
 /*
  * This gets the keys from keyboard and reports it to input subsystem
  */
+#ifdef CONFIG_SUPPORT_KEYPAD_LED
+static void keypad_led_on(const struct matrix_keypad_platform_data *pdata);
+#endif
+
 static void matrix_keypad_scan(struct work_struct *work)
 {
 	struct matrix_keypad *keypad =
@@ -498,36 +502,71 @@ matrix_keypad_parse_dt(struct device *dev)
 #endif
 
 #ifdef CONFIG_SUPPORT_KEYPAD_LED
+/* W2017: the stock ROM lights the keypad backlight when a key is pressed or
+ * the inner screen opens and turns it off a few seconds later.  Vendor code
+ * only had the regulator switch, the timer lived in the Samsung framework.
+ * regulator_enable() is reference counted, so the state has to be tracked
+ * here: repeated "on" requests must not accumulate references. */
+static int keypad_led_timeout_ms = 5000;
+module_param(keypad_led_timeout_ms, int, 0644);
+
+static struct delayed_work keypad_led_work;
+static const struct matrix_keypad_platform_data *keypad_led_pdata;
+static bool keypad_led_active;
+
+static void keypad_led_set_off(void)
+{
+	if (!keypad_led_active)
+		return;
+	if (keypad_led_pdata && keypad_led_pdata->vddo_vreg) {
+		if (regulator_disable(keypad_led_pdata->vddo_vreg))
+			pr_err("%s: could not disable keypad led regulator\n",
+				__func__);
+	}
+	keypad_led_active = false;
+	pr_info("%s: keypad led off\n", __func__);
+}
+
+static void keypad_led_off_work(struct work_struct *work)
+{
+	keypad_led_set_off();
+}
+
+static void keypad_led_on(const struct matrix_keypad_platform_data *pdata)
+{
+	if (!pdata || !pdata->vddo_vreg)
+		return;
+	keypad_led_pdata = pdata;
+	if (!keypad_led_active) {
+		if (regulator_enable(pdata->vddo_vreg))
+			pr_err("%s: could not enable keypad led regulator\n",
+				__func__);
+		else
+			keypad_led_active = true;
+	}
+	schedule_delayed_work(&keypad_led_work,
+		msecs_to_jiffies(keypad_led_timeout_ms > 0 ?
+			keypad_led_timeout_ms : 5000));
+}
+
 static ssize_t keypadled_poweron(struct device *dev,
 	struct device_attribute *attr, const char *buf,
 	size_t size)
 {
-	int ret;
 	int data;
 	struct matrix_keypad_platform_data *pdata = dev_get_drvdata(dev);
 
 	sscanf(buf, "%d", &data);
 	dev_err(dev,"%s : data = %d", __func__, data);
 
-	if (data){
-		if (pdata->vddo_vreg){
-			ret = regulator_enable(pdata->vddo_vreg);
-			if (ret) {
-				dev_err(dev,"%s: failed to enable vddo, %d\n", __func__, ret);
-				return size;
-			}
-		}
+	if (data) {
+		keypad_led_on(pdata);
 	} else {
-		if (pdata->vddo_vreg) {
-			ret = regulator_disable(pdata->vddo_vreg);
-			if (ret) {
-				dev_err(dev,"%s: failed to disable vddo, %d\n", __func__, ret);
-				return size;
-			}
-		}
+		cancel_delayed_work_sync(&keypad_led_work);
+		keypad_led_set_off();
 	}
 
-	pr_cont(" [%d]\n", regulator_is_enabled(pdata->vddo_vreg));
+	pr_cont(" [%d]\n", keypad_led_active);
 
 	return size;
 }
@@ -578,6 +617,7 @@ static int matrix_keypad_probe(struct platform_device *pdev)
 	keypad->row_shift = get_count_order(pdata->num_col_gpios);
 	keypad->stopped = true;
 	INIT_DELAYED_WORK(&keypad->work, matrix_keypad_scan);
+	INIT_DELAYED_WORK(&keypad_led_work, keypad_led_off_work);
 	spin_lock_init(&keypad->lock);
 
 
@@ -633,6 +673,14 @@ static int matrix_keypad_probe(struct platform_device *pdev)
 		printk(KERN_INFO "pdata->vddo_vreg error\n");
 		err = -EPERM;
 		goto err_free_gpio;
+	}
+	/* W2017: the bootloader leaves the keypad LED rail (pm8994_l18) enabled,
+	 * so the backlight was lit from boot and the reference count never came
+	 * back to zero.  Drop that reference here: the LED starts dark, like the
+	 * stock ROM, and our own enable/disable stays balanced. */
+	if (regulator_is_enabled(pdata->vddo_vreg)) {
+		regulator_disable(pdata->vddo_vreg);
+		printk(KERN_INFO "keypad: released boot-time vddo reference\n");
 	}
 #endif
 	device_init_wakeup(&pdev->dev, pdata->wakeup);
