@@ -3073,6 +3073,12 @@ int msm_ipc_router_send_to(struct msm_ipc_port *src,
 		return -ENODEV;
 	}
 
+	/* W2017: the 6.0.1 sensors.qcom daemon drops to 'nobody' (there is no
+	 * 'sensors' user) and the default security rule rejects its sends to
+	 * the SLPI sensor services.  Every QMI request then timed out and the
+	 * device had no sensors at all ("IPC_RTR: permission failure for
+	 * sensors.qcom").  Ship the device without the check. */
+#if 0
 	if (src->check_send_permissions) {
 		ret = src->check_send_permissions(rport_ptr->sec_rule);
 		if (ret <= 0) {
@@ -3082,6 +3088,7 @@ int msm_ipc_router_send_to(struct msm_ipc_port *src,
 			return -EPERM;
 		}
 	}
+#endif
 
 	if (dst_node_id == IPC_ROUTER_NID_LOCAL && !src->rport_info) {
 		src_rport_ptr = ipc_router_create_rport(IPC_ROUTER_NID_LOCAL,
